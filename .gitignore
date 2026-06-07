@@ -1,0 +1,4 @@
+# XY-ai-skills .gitignore
+
+# 发布流程文档（内部用，不随技能分发）
+**/released-workflow.md
