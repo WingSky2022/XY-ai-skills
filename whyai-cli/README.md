@@ -7,7 +7,7 @@
 ## 能做什么
 
 - **查**：登录状态、账户、模型清单、配额与用量、会话 / 笔记 / 记忆
-- **聊**：发起 YAI 对话、继续已有会话、联网搜索、挂载 Partner（角色）
+- **聊**：发起 YAI 对话、继续已有会话、联网搜索、挂载 Partner（角色）—— 随包带一份**官方 Partner 索引**（UUID / 名称 / TCPR 分类 / 用途说明），挑角色不必先翻列表
 - **管**：上传与下载文件、整理笔记、清理服务端记忆
 - **省**：长回复默认落盘、只读摘要，不把全文灌进对话上下文
 
@@ -49,6 +49,7 @@ whyai status --json     # 确认 logged_in: true 且 environment: prod
 | 列历史会话 | 「用 whyai 列一下我最近的会话」 |
 | 继续某个会话 | 「用 whyai 接着刚才那个会话，问它……」 |
 | 挂角色对话 | 「用 whyai 挂一个角色，帮我研究……」 |
+| 挑角色 / 查角色 ID | 「有哪些 Partner 可以挂」「那个做调研的角色 UUID 是多少」 |
 | 导出会话全文 | 「把那个 whyai 会话导出到文件」 |
 | 排查用量异常 | 「我这个月 whyai 的额度怎么用得这么快」 |
 
@@ -65,6 +66,7 @@ whyai status --json     # 确认 logged_in: true 且 environment: prod
 |:--|:--|
 | `SKILL.md` | 技能主体：保密模式、出境确认、命令路由、安全边界 |
 | `references/model-catalog.json` | 可用模型清单与默认模型策略 |
+| `references/partner-registry.json` | 官方 Partner（角色）索引：UUID、名称、slug、TCPR 分类、用途说明、适用模型 |
 | `README.md` | 本文件 |
 
 ## 出问题怎么办

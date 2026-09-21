@@ -3,10 +3,10 @@ name: whyai-cli
 description: |
   通过本地 whyai CLI 调用 YAI / 一堂服务：用户明确要求使用 YAI、委托 YAI 处理任务、查看账户/模型/配额/用量、排查 token 消耗异常，或管理 YAI 会话与文件时触发；检测不到 CLI 时按官方说明自动安装。
   默认保密模式（只拉取不出境，出境需当次确认）。用户说「解开/解放保密模式」时本会话内免逐次确认（凭据/不可逆公开/不可逆删除/账号与环境变更四类红线除外，不跨会话继承）。
-  支持查询与挂载 YAI 侧 Partner（partners 只读、chat --partner 挂角色）；长文本默认落盘只读摘要（chat 重定向、conversations export --output、勿用 messages list）；多轮任务在发起第二轮前把会话 id 写入锚点文件（多任务共用一份 map）、逐轮用 -c 续用（绝不把历史回灌新会话），且必须留存 stderr。
+  支持查询与挂载 YAI 侧 Partner（partners 只读、可见伙伴的 UUID 注册表在 references/partner-registry.json、chat --partner 挂角色，调用一律以 UUID 为准因为名字会变）；长文本默认落盘只读摘要（chat 重定向、conversations export --output、勿用 messages list）；多轮任务在发起第二轮前把会话 id 写入锚点文件（多任务共用一份 map）、逐轮用 -c 续用（绝不把历史回灌新会话），且必须留存 stderr。
   多伙伴协作按「是否需自动交叉引用」选架构；省 token 姿势与成本异常诊断（先定账本：服务端配额 vs 本地额度，平方由轮数而非命令造成）见「命令路由 §D–§E」；会话锚定、中途断联后的续用见「会话锚定、中断与恢复」。
 argument-hint: "[check|install|status|login|models|account|billing|usage|conversations|partners|notes|memories|files|yitang|chat|upgrade]"
-version: 1.14.0
+version: 1.15.0
 author: WingSky
 ---
 
@@ -196,7 +196,7 @@ whyai status --json
 | 消息列表（⚠️ 全文走 stdout） | `whyai messages list <conversation-id>` —— 实测 65KB 全部进本地上下文；**除非确需在上下文里比对，否则改用 export** |
 | 笔记读取 | `whyai notes list\|get\|export <id>` |
 | 记忆审计 | `whyai memories list --json` |
-| 伙伴只读 | `whyai partners list\|search\|resolve\|get\|history\|tags\|icons`、`partners conversations\|recommended <id>` |
+| 伙伴只读 | `whyai partners list\|search\|resolve\|get\|history\|tags\|icons`、`partners conversations\|recommended <id>`（**可见伙伴清单见 [`references/partner-registry.json`](references/partner-registry.json)**） |
 | 文件元信息 | `whyai files list\|quota` |
 | 一堂只读数据 | `whyai yitang homework list\|show`、`course info\|sections`、`me show` 等 `risk: read` 能力 |
 
@@ -234,9 +234,17 @@ Partner 是 YAI 侧的角色（人格 + 提示词 + 知识库配置），**不�
 
 **唯一调用路径是 `chat --partner`。不存在 `partners run` / `invoke` 这类独立执行命令。**
 
+**先查注册表，再选伙伴** —— 官方发布的伙伴已整理为 [`references/partner-registry.json`](references/partner-registry.json)（含 **UUID / 名字 / slug / TCPR / 分类 / 状态 / 适用模型**）。要点：
+
+- ⭐ **UUID 是唯一稳定键**：`name` 可被服务端改、`slug` 不保证存在（部分伙伴没有）、`category`/`tcpr` 也会变——**只有 UUID 不随改名变化**。凡是要写进脚本、锚点文件或长期记忆的，一律记 UUID，名字只作人读线索。
+- **想按用途挑伙伴**：`tcpr_type`（T 教学 / C 咨询 / P 实践 / R 研究）与 `description` 是现成的筛选维度。
+- **想知道自己实际在用的是哪几个**：`whyai partners history` 会给出每个伙伴的使用次数与最近使用时间。
+- ⚠️ **`partners history` 有分页**：默认 `--page-size 20`，只看第一页会把「用过多少个」数小；要全量就 `--page 2 --page-size 20` 翻页。`partners list` 则无分页参数，一次即全量。
+- **注册表不是真相源**：它只是快照，冲突时以 `whyai partners list --json` 的实测输出为准；伙伴增删改名以服务端返回为准。
+
 ```bash
 # 1) 找伙伴（只读）——search 对 name + description 做子串匹配
-whyai partners list --json                              # 全量
+whyai partners list --json                              # 全量（无分页参数，一次即全量）
 whyai partners search "调研" --json                      # 子串搜
 whyai partners list --type R --json                     # 按 TCPR 过滤：T 教学 / C 咨询 / P 实践 / R 研究
 whyai partners search "调研" --scope official --json     # 只看官方
