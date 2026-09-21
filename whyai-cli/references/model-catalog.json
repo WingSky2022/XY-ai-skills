@@ -1,0 +1,159 @@
+{
+  "_meta": {
+    "title": "whyai CLI 可用模型清单（服务端快照）",
+    "version": 1,
+    "captured_at": "2026-09-21",
+    "captured_cli_version": "0.5.7",
+    "account": "通用模型清单（公开版不含特定账号信息）",
+    "source_command": "whyai models list --json",
+    "truth_source": "服务端实时返回 —— 本文件是快照，不是真相源；以 `whyai models list --json` 实测为准",
+    "refresh_rule": "模型清单由服务端下发，可能随时增删；调用前可用 `whyai models list --json` 核对",
+    "field_semantics": "各字段含义见 官方接口文档 的 models.list[] 命名空间，本文件不重复解释",
+    "scope": "只登记「当前账号可见」的模型；账号权限不同，可见范围可能不同"
+  },
+  "default_policy": {
+    "default_model": "deepseek-v4-flash",
+    "vision_model": "deepseek-v4-flash-vision-exp",
+    "rationale": "默认模型取「能力与成本平衡」的 flash；只有图片理解需要多模态时才切换到 vision 版",
+    "rules": [
+      "新建会话的 chat 默认显式加 --model deepseek-v4-flash（不再依赖服务端默认）",
+      "本次消息带图片附件（--file 指向 .png/.jpg/.jpeg/.webp/.gif）时，改用 --model deepseek-v4-flash-vision-exp",
+      "非图片附件（pdf/docx/xlsx 等）仍用默认模型 —— 文档解析不需要 vision 能力",
+      "混有图片与文档时按图片处理（取 vision 模型）",
+      "用户显式指定 --model 时一律以用户为准，不套用本策略",
+      "续用已有会话（-c <id>）不传 --model：payload 会带上该字段且服务端行为未验证，保守做法是保持会话原模型不变",
+      "conversations create（预锚）若不立刻发消息，也不传 --model，留待首次 chat 时按本策略决定"
+    ],
+    "guard": "两个 alias 若在本清单中消失或失去关键能力，scripts/模型清单校验 会报 P0 —— 默认策略失效，必须先修策略再调用"
+  },
+  "model_count": 6,
+  "models": [
+    {
+      "alias": "deepseek-v4-flash-vision-exp",
+      "name": "DeepSeek V4 Flash Vision Exp",
+      "display_group": "DeepSeek",
+      "owned_by": "deepseek",
+      "model_type": "chat",
+      "description": "DeepSeek V4 Flash Vision 多模态实验版，支持视觉、推理、工具调用、1M上下文",
+      "context_window": 1048576,
+      "max_tokens": 393216,
+      "priority": 10,
+      "provider_count": 1,
+      "is_external": false,
+      "vision": true,
+      "capabilities": [
+        "function_calling",
+        "json_mode",
+        "reasoning",
+        "streaming",
+        "system_prompt",
+        "vision"
+      ]
+    },
+    {
+      "alias": "deepseek-v4-pro",
+      "name": "DeepSeek V4 Pro",
+      "display_group": "DeepSeek",
+      "owned_by": "deepseek",
+      "model_type": "chat",
+      "description": "高性能版本，支持推理思考、工具调用、1M上下文窗口",
+      "context_window": 1048576,
+      "max_tokens": 393216,
+      "priority": 10,
+      "provider_count": 2,
+      "is_external": false,
+      "vision": false,
+      "capabilities": [
+        "function_calling",
+        "json_mode",
+        "reasoning",
+        "streaming"
+      ]
+    },
+    {
+      "alias": "glm-5.1",
+      "name": "GLM-5.1",
+      "display_group": "GLM",
+      "owned_by": "z-ai",
+      "model_type": "chat",
+      "description": "",
+      "context_window": 202752,
+      "max_tokens": 131072,
+      "priority": 10,
+      "provider_count": 1,
+      "is_external": false,
+      "vision": false,
+      "capabilities": [
+        "function_calling",
+        "json_mode",
+        "reasoning",
+        "streaming"
+      ]
+    },
+    {
+      "alias": "deepseek-v4-flash",
+      "name": "DeepSeek V4 Flash",
+      "display_group": "DeepSeek",
+      "owned_by": "deepseek",
+      "model_type": "chat",
+      "description": "Flash正式版 目前比 Pro预览版 更强更快，直接选它就行。",
+      "context_window": 1048576,
+      "max_tokens": 393216,
+      "priority": 5,
+      "provider_count": 2,
+      "is_external": false,
+      "vision": false,
+      "capabilities": [
+        "function_calling",
+        "json_mode",
+        "reasoning",
+        "streaming"
+      ]
+    },
+    {
+      "alias": "glm-5.2",
+      "name": "glm-5.2",
+      "display_group": "GLM",
+      "owned_by": "custom",
+      "model_type": "chat",
+      "description": "GLM-5.2",
+      "context_window": 1000000,
+      "max_tokens": 128000,
+      "priority": 5,
+      "provider_count": 1,
+      "is_external": false,
+      "vision": false,
+      "capabilities": [
+        "function_calling",
+        "json_mode",
+        "reasoning",
+        "streaming"
+      ]
+    },
+    {
+      "alias": "kimi-k2.5",
+      "name": "kimi-k2.5",
+      "display_group": "KIMI",
+      "owned_by": "custom",
+      "model_type": "chat",
+      "description": "",
+      "context_window": 262144,
+      "max_tokens": 65536,
+      "priority": 5,
+      "provider_count": 1,
+      "is_external": false,
+      "vision": true,
+      "capabilities": [
+        "function_calling",
+        "reasoning",
+        "streaming",
+        "vision"
+      ]
+    }
+  ],
+  "notes": [
+    "全部模型 is_external=false、model_type=chat，visible 范围由服务端按账号权限裁剪",
+    "历史会话的 model_id 可能包含已下线模型（deepseek-chat / LongCat-Flash-Chat），不代表当前可选",
+    "priority 与 provider_count 的语义尚未证实，见 官方接口文档"
+  ]
+}
