@@ -242,11 +242,11 @@ whyai partners list --type R --json                     # 按 TCPR 过滤：T �
 whyai partners search "调研" --scope official --json     # 只看官方
 
 # 2) 解析成 id（只读）——确认唯一性，避免歧义报错
-whyai partners resolve "高阶调研·爆炸式研究专家" --json
+whyai partners resolve "<角色名>" --json
 
 # 3) 挂角色开新会话（出境，需先确认；会附带一次使用记录写入）
 whyai chat --partner <partner-id> "研究课题"
-whyai chat --partner "高阶调研·爆炸式研究专家" "研究课题"     # 中文精确名同样可用
+whyai chat --partner "<角色名>" "研究课题"     # 中文精确名同样可用
 
 # 4) 续用已有会话（-c 优先，此时 --partner 被忽略）
 whyai chat -c <conversation-id> "继续"
@@ -296,7 +296,7 @@ whyai chat -c <conversation-id> "继续"
 
 ```bash
 # 正文落盘；过程与推理单独走 stderr（需要时才加 --show-thinking）
-whyai chat --partner "高阶调研·爆炸式研究专家" "课题" --no-memory \
+whyai chat --partner "<角色名>" "课题" --no-memory \
   > /tmp/whyai-out.json 2> /tmp/whyai-run.log
 
 # 只读元数据：会话 id / 正文长度 / 工具调用次数 —— 正文留在文件里
