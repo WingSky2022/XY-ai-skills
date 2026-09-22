@@ -55,7 +55,7 @@ checklist-go/
      }
    }
    ```
-   > 将 `<HOME>` 替换为用户主目录的绝对路径（Windows 如 `C:\\Users\\xxx`，macOS/Linux 如 `/home/xxx`）。AI 执行时会自动解析。
+   > 将 `<HOME>` 替换为用户主目录的绝对路径（Windows 如 `C:\\Users\\<用户名>`，macOS/Linux 如 `/home/<用户名>`）。AI 执行时会自动解析。
 
 3. **激活**：在 CC 中输入 `/checklist-go`，即可开始清单体对话。
 
