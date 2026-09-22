@@ -4,3 +4,5 @@
 **/released-workflow.md
 
 .workbuddy/
+.DS_Store
+.commandcode/
