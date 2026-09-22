@@ -198,7 +198,6 @@
   function validate(d) {
     if (!d || typeof d !== 'object') throw new Error('数据不是对象');
     if (!Array.isArray(d.rows)) throw new Error('rows 不是数组');
-    if (!d.rows.length) throw new Error('rows 为空');
     for (var i = 0; i < d.rows.length; i++) {
       var r = d.rows[i];
       if (typeof r.title !== 'string' || typeof r.score !== 'number')
@@ -251,7 +250,13 @@
     byId('n-oexc').textContent = (typeof acc.officialExcellent === 'number') ? acc.officialExcellent : '待填写';
     byId('n-exc').textContent = exc;
     byId('n-date').textContent = (d.meta && d.meta.snapshotDate) || '—';
-    byId('sub').textContent = (hasAcc ? '' : '账户口径待填写（account 四项）· ') + '快照 ' + ((d.meta && d.meta.snapshotDate) || '—') +
+    var noRows = rows.length === 0;
+    if (noRows) {
+      byId('empty').textContent = '尚无数据 —— 请用工作台启动器打开（workbench/start-workbench.command），页面经本地服务才能读取数据目录的 JSON';
+    } else {
+      byId('empty').textContent = '没有匹配的记录';
+    }
+    byId('sub').textContent = (noRows ? '尚无数据（请用工作台启动器打开）· ' : '') + (hasAcc ? '' : '账户口径待填写（account 四项）· ') + '快照 ' + ((d.meta && d.meta.snapshotDate) || '—') +
       ' · 共 ' + rows.length + ' 条作业';
 
     var distEl = byId('dist');

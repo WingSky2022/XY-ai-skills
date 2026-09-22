@@ -1,10 +1,11 @@
 # yitang-homework-snapshot · 作业评分快照
 
-一条命令把你在「一堂」的**全部作业评分**（1–6 分）拉到本地，生成一对文件：JSON 数据真相源 + 自包含 HTML 工作台（评分分布、搜索、档位筛选、手机端卡片视图）。可选把作业正文全文一并归档。
+一条命令把你在「一堂」的**全部作业评分**（1–6 分）拉到本地：数据写进数据目录的 JSON（真相源），工作台前端在技能内，经本地服务打开即读该 JSON（评分分布、搜索、档位筛选、手机端卡片视图）。可选把作业正文全文一并归档。
 
 - **只读、零出境**：只调用本地 `whyai` CLI 的只读接口，没有任何本地内容发往服务端。
 - **自包含**：不依赖其他技能；环境核对（版本基线 + 登录态）内嵌在脚本里。
-- **数据你做主**：JSON 是真相源，可手填；HTML 是展示模板，改数据后一键刷新。
+- **关注点分离**：技能目录放程序与前端（**不含个人数据**），个人数据只写数据目录（默认 `~/Documents/一堂作业工作台`，可在 `config.json` 改）。
+- **两段式**：先出报告，你确认后才写入。
 
 ## 安装
 
@@ -18,7 +19,6 @@
 **直接命令行**（两段式：先检查，确认后才写入）：
 
 ```bash
-cd 你想存放数据的目录
 python3 <技能目录>/scripts/refresh_homework.py                # 第一段：检查 + 出报告，不写任何文件
 python3 <技能目录>/scripts/refresh_homework.py --confirm --serve   # 第二段：确认后写入并拉起工作台
 python3 <技能目录>/scripts/refresh_homework.py --confirm --with-raw  # 顺带归档作业正文全文
@@ -29,11 +29,11 @@ python3 <技能目录>/scripts/refresh_homework.py --confirm --with-raw  # 顺�
 工作台随时可单独打开：
 
 ```bash
-python3 <技能目录>/scripts/start_workbench.py --dir <数据目录>        # 前台服务 + 自动开浏览器
-python3 <技能目录>/scripts/start_workbench.py --dir <数据目录> --stop # 停止后台服务
+python3 <技能目录>/scripts/start_workbench.py        # 前台服务 + 自动开浏览器
+python3 <技能目录>/scripts/start_workbench.py --stop # 停止后台服务
 ```
 
-数据目录里也会生成双击入口：macOS `start-workbench.command`、Windows `start-workbench.bat`。
+也可双击 `workbench/start-workbench.command`（macOS）/ `workbench/start-workbench.bat`（Windows）。服务是双根的：前端在技能内、数据在数据目录，页面总是读取真实 JSON。
 
 ## 约定（使用前请读）
 

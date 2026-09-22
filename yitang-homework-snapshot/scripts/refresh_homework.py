@@ -1,27 +1,31 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""作业评分快照刷新：whyai CLI 只读拉取「一堂」全部作业评分 → 本地 JSON 数据真相源 + 自包含 HTML 工作台。
+"""作业评分快照刷新：whyai CLI 只读拉取「一堂」全部作业评分 → 数据目录写 JSON + 技能内生成工作台。
+
+目录约定（关注点分离）：
+  技能目录/            程序 + 工作台前端（workbench/，不含个人数据）
+  数据目录/            只有数据：一堂作业评分清单.json（可选 raw/ 正文归档）
+  数据目录由技能内 config.json 的 data_dir 指定（相对路径按技能目录解析，便于跨机同步）
 
 流程：
   0. 环境核对（版本基线 + 登录态/Gateway，可用 --skip-env-check 跳过）
   1. 发现 whyai CLI（env WHYAI_BIN > PATH > macOS ~/.local/bin > Windows %LOCALAPPDATA%\\WhyAI\\bin）
   2. 分页拉取 homework list（只读），去重组装 rows
   3. 与现有 JSON 合并：保留 account（账户学分为官方口径，不从作业列表推算）
-  4. 原子写 JSON（默认先把旧文件备份为 .bak）
-  5. 目标目录无 HTML 时从 assets/workbench.template.html 实例化工作台；已有则仅替换 seed 块
+  4. 原子写 JSON 到数据目录（默认先把旧文件备份为 .bak）
+  5. 在技能内 workbench/ 生成工作台前端（空 seed，不含个人数据）；页面经本地服务读取数据目录的 JSON
 
 只读拉取、零出境：不调用 whyai chat / 上传 / 任何写操作。
 两段式流程（写入前必须过确认门禁）：
   python3 refresh_homework.py                    # 第一段：环境核对 + 只读拉取 + 出报告，**不写文件**
   python3 refresh_homework.py --confirm          # 第二段：用户确认后执行全量写入
   python3 refresh_homework.py --confirm --serve  # 写入后直接拉起后台服务并打开工作台
-  python3 refresh_homework.py --confirm --with-raw   # 顺带归档作业正文全文到 raw/
+  python3 refresh_homework.py --confirm --with-raw   # 顺带归档作业正文全文到 数据目录/raw/
 """
 import argparse
 import datetime
 import json
 import os
-import re
 import shutil
 import socket
 import subprocess
@@ -30,10 +34,19 @@ import tempfile
 import time
 import urllib.parse
 
-NAME = "一堂作业评分清单"
+DATA_NAME = "一堂作业评分清单"
+PAGE_NAME = "一堂作业评分清单.html"
 SKILL_DIR = os.path.dirname(os.path.abspath(__file__))
-TEMPLATE = os.path.join(SKILL_DIR, "..", "assets", "workbench.template.html")
-DEFAULT_TARGET = os.getcwd()
+SKILL_ROOT = os.path.abspath(os.path.join(SKILL_DIR, ".."))
+TEMPLATE = os.path.join(SKILL_ROOT, "assets", "workbench.template.html")
+WORKBENCH_DIR = os.path.join(SKILL_ROOT, "workbench")
+CONFIG_PATH = os.path.join(SKILL_ROOT, "config.json")
+DEFAULT_DATA_DIR = os.path.expanduser("~/Documents/一堂作业工作台")
+
+# 环境核对基线：与本技能核对时的 whyai CLI 版本。版本变化可能意味着行为边界变化，
+# 不一致时脚本默认拒绝执行；人工确认版本变化无碍后可加 --skip-env-check。
+BASELINE_VERSION = "0.5.8"
+GATEWAY = "https://ai.yitang.top"
 
 sys.path.insert(0, SKILL_DIR)
 try:
@@ -41,10 +54,30 @@ try:
 except Exception:
     wb = None
 
-# 环境核对基线：与本技能核对时的 whyai CLI 版本。版本变化可能意味着行为边界变化，
-# 不一致时脚本默认拒绝执行；人工确认版本变化无碍后可加 --skip-env-check。
-BASELINE_VERSION = "0.5.7"
-GATEWAY = "https://ai.yitang.top"
+
+def resolve_data_dir(cli_target):
+    """数据目录优先级：--target > 环境变量 YITANG_HOMEWORK_DATA_DIR > config.json 的 data_dir > 内置默认。
+
+    config.json 里的相对路径按技能目录解析 —— 技能随仓库同步时，数据目录也跟着走，无需改配置。
+    """
+    if cli_target:
+        return os.path.abspath(os.path.expanduser(cli_target))
+    env = os.environ.get("YITANG_HOMEWORK_DATA_DIR")
+    if env:
+        return os.path.abspath(os.path.expanduser(env))
+    cfg_dir = None
+    if os.path.exists(CONFIG_PATH):
+        try:
+            with open(CONFIG_PATH, encoding="utf-8") as fh:
+                cfg_dir = (json.load(fh) or {}).get("data_dir")
+        except Exception as e:
+            print("[WARN] config.json 解析失败（%s），改用内置默认目录" % e)
+    if cfg_dir:
+        cfg_dir = os.path.expanduser(str(cfg_dir))
+        if not os.path.isabs(cfg_dir):
+            cfg_dir = os.path.join(SKILL_ROOT, cfg_dir)
+        return os.path.abspath(cfg_dir)
+    return DEFAULT_DATA_DIR
 
 
 def find_whyai():
@@ -111,8 +144,7 @@ def build_rows(items):
             "wordCount": it.get("textCount") or 0,
             "date": it.get("editTime") or "",
         }
-    out = sorted(rows.values(), key=lambda r: (-r["score"], r["date"]))
-    return out
+    return sorted(rows.values(), key=lambda r: (-r["score"], r["date"]))
 
 
 def summarize(rows):
@@ -128,77 +160,16 @@ def summarize(rows):
     return dist, s, graded
 
 
-def serve_in_background(target):
-    """拉起后台静态服务（前端由此能读取同名 JSON），并打开浏览器。
-
-    父进程自选端口并把子进程输出写入日志文件（不接管道）：否则父进程退出后管道断裂，
-    子进程后续写日志会触发 BrokenPipe 而崩溃。
-    """
-    target = os.path.abspath(target)
-    starter = os.path.join(SKILL_DIR, "start_workbench.py")
-    if wb is None or not os.path.exists(starter):
-        print("[WARN] 启动器不可用（%s），已跳过拉起服务" % starter)
-        return
-    page = wb.pick_page(target)
-    if not page:
-        print("[WARN] 目标目录无 HTML 工作台，跳过拉起服务")
-        return
-
-    port = wb.free_port()
-    log_path = os.path.join(target, ".workbench-server.log")
-    kwargs = {}
-    if os.name == "nt":
-        kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-    else:
-        kwargs["start_new_session"] = True
-    with open(log_path, "a", encoding="utf-8") as log:
-        proc = subprocess.Popen(
-            [sys.executable, starter, "--dir", target, "--port", str(port),
-             "--no-browser", "--quiet"],
-            stdout=log, stderr=log, stdin=subprocess.DEVNULL, **kwargs)
-
-    ok = False
-    for _ in range(40):
-        try:
-            with socket.create_connection(("127.0.0.1", port), 0.2):
-                ok = True
-                break
-        except OSError:
-            time.sleep(0.1)
-    url = "http://127.0.0.1:%d/%s" % (port, urllib.parse.quote(page))
-    if ok:
-        import webbrowser
-        webbrowser.open(url)
-        print("后台服务已启动（PID %d）：%s" % (proc.pid, url))
-        print("停止服务：python3 %s --dir %s --stop" % (starter, target))
-        print("服务日志：%s" % log_path)
-    else:
-        print("[WARN] 后台服务未就绪，可手动运行：python3 %s --dir %s" % (starter, target))
-        print("       日志见：%s" % log_path)
-
-
-def write_launchers(target):
-    """在数据目录生成双击启动入口（就近可用，不必记路径）。"""
-    starter = os.path.join(SKILL_DIR, "start_workbench.py")
-    cmd = os.path.join(target, "start-workbench.command")
-    bat = os.path.join(target, "start-workbench.bat")
-    try:
-        with open(cmd, "w", encoding="utf-8") as fh:
-            fh.write('#!/bin/bash\ncd "$(dirname "$0")"\nexec python3 "%s" --dir "$(pwd)"\n' % starter)
-        os.chmod(cmd, 0o755)
-        with open(bat, "w", encoding="ascii", errors="ignore") as fh:
-            fh.write('@echo off\r\npython "%s" --dir "%%~dp0"\r\npause\r\n' % starter)
-        print("已生成启动入口：start-workbench.command（macOS 双击/右键打开）、start-workbench.bat（Windows）")
-    except Exception as e:
-        print("[WARN] 生成启动入口失败：%s" % e)
-
-
 def atomic_write(path, text, backup=True):
     if backup and os.path.exists(path):
-        bak = path + ".bak"
+        # 备份放隐藏子目录，保持数据目录顶层干净（只留数据文件本身）
+        bak_dir = os.path.join(os.path.dirname(path), ".backup")
+        os.makedirs(bak_dir, exist_ok=True)
+        bak = os.path.join(bak_dir, os.path.basename(path) + ".bak")
         shutil.copy2(path, bak)
-        print("  备份: %s -> %s" % (os.path.basename(path), os.path.basename(bak)))
+        print("  备份: %s -> .backup/%s" % (os.path.basename(path), os.path.basename(bak)))
     d = os.path.dirname(path)
+    os.makedirs(d, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=d, suffix=".tmp")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
@@ -210,21 +181,111 @@ def atomic_write(path, text, backup=True):
         raise
 
 
+def write_workbench(backup=True):
+    """在技能内 workbench/ 生成工作台前端（空 seed：个人数据只存在于数据目录的 JSON）。"""
+    if not os.path.exists(TEMPLATE):
+        print("[WARN] 未找到模板 %s，跳过工作台生成" % TEMPLATE)
+        return None
+    with open(TEMPLATE, encoding="utf-8") as fh:
+        tpl = fh.read()
+    if "__SEED__" not in tpl or "__NAME__" not in tpl:
+        print("[WARN] 模板缺少 __SEED__/__NAME__ 占位符，跳过工作台生成")
+        return None
+    empty_seed = json.dumps({
+        "version": 1,
+        "meta": {"snapshotDate": ""},
+        "account": {},
+        "rows": [],
+    }, ensure_ascii=False, separators=(",", ":"))
+    inst = tpl.replace("__SEED__", empty_seed).replace("__NAME__", DATA_NAME)
+    os.makedirs(WORKBENCH_DIR, exist_ok=True)
+    page_path = os.path.join(WORKBENCH_DIR, PAGE_NAME)
+    atomic_write(page_path, inst, backup=backup)
+    gi = os.path.join(WORKBENCH_DIR, ".gitignore")
+    with open(gi, "w", encoding="utf-8") as fh:
+        fh.write(".workbench-server.pid\n.workbench-server.log\n.backup/\n*.bak\n")
+    print("工作台前端：%s（空 seed；页面经本地服务读取数据目录 JSON）" % page_path)
+    return page_path
+
+
+def write_launchers():
+    """在技能内 workbench/ 生成双击启动入口（按 config.json 定位数据目录，不写任何数据）。"""
+    starter = os.path.join(SKILL_DIR, "start_workbench.py")
+    cmd = os.path.join(WORKBENCH_DIR, "start-workbench.command")
+    bat = os.path.join(WORKBENCH_DIR, "start-workbench.bat")
+    try:
+        os.makedirs(WORKBENCH_DIR, exist_ok=True)
+        with open(cmd, "w", encoding="utf-8") as fh:
+            fh.write('#!/bin/bash\ncd "$(dirname "$0")"\nexec python3 "%s"\n' % starter)
+        os.chmod(cmd, 0o755)
+        with open(bat, "w", encoding="ascii", errors="ignore") as fh:
+            fh.write('@echo off\r\npython "%s"\r\npause\r\n' % starter)
+        print("启动入口：workbench/start-workbench.command（macOS 双击）、workbench/start-workbench.bat（Windows）")
+    except Exception as e:
+        print("[WARN] 生成启动入口失败：%s" % e)
+
+
+def serve_in_background(data_dir):
+    """拉起后台静态服务（双根：技能内工作台 + 数据目录），并打开浏览器。
+
+    父进程自选端口并把子进程输出写入日志文件（不接管道）：否则父进程退出后管道断裂，
+    子进程后续写日志会触发 BrokenPipe 而崩溃。
+    """
+    starter = os.path.join(SKILL_DIR, "start_workbench.py")
+    if wb is None or not os.path.exists(starter):
+        print("[WARN] 启动器不可用（%s），已跳过拉起服务" % starter)
+        return
+    os.makedirs(WORKBENCH_DIR, exist_ok=True)
+    port = wb.free_port()
+    log_path = os.path.join(WORKBENCH_DIR, ".workbench-server.log")
+    kwargs = {}
+    if os.name == "nt":
+        kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    else:
+        kwargs["start_new_session"] = True
+    with open(log_path, "a", encoding="utf-8") as log:
+        proc = subprocess.Popen(
+            [sys.executable, starter, "--data", os.path.abspath(data_dir),
+             "--port", str(port), "--no-browser", "--quiet"],
+            stdout=log, stderr=log, stdin=subprocess.DEVNULL, **kwargs)
+
+    ok = False
+    for _ in range(40):
+        try:
+            with socket.create_connection(("127.0.0.1", port), 0.2):
+                ok = True
+                break
+        except OSError:
+            time.sleep(0.1)
+    url = "http://127.0.0.1:%d/%s" % (port, urllib.parse.quote(PAGE_NAME))
+    if ok:
+        import webbrowser
+        webbrowser.open(url)
+        print("后台服务已启动（PID %d）：%s" % (proc.pid, url))
+        print("停止服务：python3 %s --stop" % starter)
+        print("服务日志：%s" % log_path)
+    else:
+        print("[WARN] 后台服务未就绪，可手动运行：python3 %s --data %s" % (starter, data_dir))
+        print("       日志见：%s" % log_path)
+
+
 def main():
-    ap = argparse.ArgumentParser(description="作业评分快照刷新（whyai CLI 只读拉取 → JSON + 工作台）")
+    ap = argparse.ArgumentParser(description="作业评分快照刷新（whyai CLI 只读拉取 → 数据目录 JSON + 技能内工作台）")
     ap.add_argument("--confirm", action="store_true",
                     help="用户已确认：执行全量写入。未加此参数时等同 dry-run（只报告，不写文件）")
     ap.add_argument("--dry-run", action="store_true", help="显式只报告不写文件（默认行为，冗余保留）")
     ap.add_argument("--serve", action="store_true", help="写入完成后拉起后台服务并打开工作台")
     ap.add_argument("--pages", type=int, default=0, help="限定页数（默认按 meta.pageCount 自动）")
-    ap.add_argument("--target", default=DEFAULT_TARGET, help="输出目录（默认当前目录）")
+    ap.add_argument("--target", default=None, help="数据目录（默认读技能内 config.json 的 data_dir）")
     ap.add_argument("--no-backup", action="store_true", help="覆盖前不生成 .bak")
     ap.add_argument("--skip-env-check", action="store_true",
                     help="跳过版本基线与登录态核对（人工确认环境无碍后使用）")
     ap.add_argument("--with-raw", action="store_true",
-                    help="同时归档原始 API 返回（含作业正文全文）到 raw/一堂作业正文-<日期>.json")
+                    help="同时归档原始 API 返回（含作业正文全文）到 数据目录/raw/一堂作业正文-<日期>.json")
     args = ap.parse_args()
     dry = args.dry_run or not args.confirm
+
+    data_dir = resolve_data_dir(args.target)
 
     whyai = find_whyai()
     if not whyai:
@@ -253,8 +314,7 @@ def main():
     if total and len(rows) != total:
         print("[WARN] 去重后 %d 条 != totalCount %d，请人工核对" % (len(rows), total))
 
-    json_path = os.path.join(args.target, NAME + ".json")
-    html_path = os.path.join(args.target, NAME + ".html")
+    json_path = os.path.join(data_dir, DATA_NAME + ".json")
 
     old = None
     if os.path.exists(json_path):
@@ -269,7 +329,8 @@ def main():
         nrows = {r["id"]: r for r in rows}
         added = sorted(set(nrows) - set(orows))
         removed = sorted(set(orows) - set(nrows))
-        changed = [(i, orows[i]["score"], nrows[i]["score"], nrows[i]["title"]) for i in sorted(set(orows) & set(nrows)) if orows[i]["score"] != nrows[i]["score"]]
+        changed = [(i, orows[i]["score"], nrows[i]["score"], nrows[i]["title"])
+                   for i in sorted(set(orows) & set(nrows)) if orows[i]["score"] != nrows[i]["score"]]
         if added:
             print("  新增 %d 条:" % len(added))
             for i in added[:10]:
@@ -286,11 +347,12 @@ def main():
     if dry:
         print("-" * 46)
         print("[待确认] 全量下载与写入请求（本次仅只读检查，未写任何文件）")
-        print("  目标目录：%s" % os.path.abspath(args.target))
+        print("  数据目录：%s" % data_dir)
+        print("  技能目录：%s（工作台前端与程序，不含个人数据）" % SKILL_ROOT)
         print("  已读取：%d 页 / %d 条作业" % (page_count, len(rows)))
         print("  将写入：")
-        print("    一堂作业评分清单.json（%d 条，account 保留人工口径）" % len(rows))
-        print("    一堂作业评分清单.html（无则从模板实例化，有则只同步 seed）")
+        print("    %s（%d 条，account 保留人工口径）" % (json_path, len(rows)))
+        print("    workbench/%s（技能内工作台前端，空 seed）" % PAGE_NAME)
         if args.with_raw:
             print("    raw/一堂作业正文-%s.json（正文全文）" % today)
         print("  确认后执行：python3 %s --confirm%s" % (
@@ -300,14 +362,15 @@ def main():
 
     account = (old or {}).get("account") or {}
     if not account.get("score"):
-        print("[WARN] 现有 JSON 无 account（账户学分），沿用空值；请在 JSON 手工补 account 后再生成报告口径")
+        print("[WARN] 数据文件无 account（账户学分），沿用空值；请在 JSON 手工补 account 后再生成报告口径")
     data = {
         "version": (old or {}).get("version", 1),
         "meta": {
             "snapshotDate": today,
             "fetchedAt": now,
             "title": (old.get("meta", {}).get("title") if old else None) or "一堂作业评分数据（真相源）",
-            "source": (old.get("meta", {}).get("source") if old else None) or "whyai yitang homework list（只读分页）+ me.info + summary.current",
+            "source": (old.get("meta", {}).get("source") if old else None)
+                      or "whyai yitang homework list（只读分页）+ me.info + summary.current",
             "fillGuide": (old.get("meta", {}).get("fillGuide") if old else None) or (
                 "以后更新：重新运行本技能脚本 refresh_homework.py 自动刷新；"
                 "或手填 rows（id/title/score/excellent/commented/wordCount/date）与 account 四项——"
@@ -317,37 +380,12 @@ def main():
         "rows": rows,
     }
 
-    os.makedirs(args.target, exist_ok=True)
+    os.makedirs(data_dir, exist_ok=True)
     atomic_write(json_path, json.dumps(data, ensure_ascii=False, indent=2) + "\n", backup=not args.no_backup)
     print("写入: %s (%d bytes)" % (json_path, os.path.getsize(json_path)))
 
-    if os.path.exists(html_path):
-        with open(html_path, encoding="utf-8") as fh:
-            html = fh.read()
-        seed = json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
-        new_html, n = re.subn(
-            r'(<script id="seed" type="application/json">).*?(</script>)',
-            lambda m: m.group(1) + seed + m.group(2),
-            html, flags=re.S)
-        if n != 1:
-            print("[WARN] HTML 中未定位到唯一 seed 块（找到 %d 处），HTML 未改动" % n)
-        else:
-            atomic_write(html_path, new_html, backup=not args.no_backup)
-            print("写入: %s（仅替换 seed 块，其余内容未动）" % html_path)
-    else:
-        # 工作台不存在：从技能自带模板实例化（首次使用即得完整工作台）
-        if os.path.exists(TEMPLATE):
-            with open(TEMPLATE, encoding="utf-8") as fh:
-                tpl = fh.read()
-            seed = json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
-            if "__SEED__" not in tpl or "__NAME__" not in tpl:
-                print("[WARN] 模板缺少 __SEED__/__NAME__ 占位符，请检查 assets/workbench.template.html")
-            else:
-                inst = tpl.replace("__SEED__", seed).replace("__NAME__", NAME)
-                atomic_write(html_path, inst, backup=not args.no_backup)
-                print("写入: %s（自模板实例化工作台）" % html_path)
-        else:
-            print("[WARN] 未找到 %s 且目标无 HTML，跳过工作台生成" % TEMPLATE)
+    write_workbench(backup=not args.no_backup)
+    write_launchers()
 
     if args.with_raw:
         seen = {}
@@ -355,7 +393,7 @@ def main():
             seen[it["id"]] = it
         raw_items = sorted(seen.values(),
                            key=lambda r: (-(r.get("score") or 0), r.get("editTime") or ""))
-        raw_dir = os.path.join(args.target, "raw")
+        raw_dir = os.path.join(data_dir, "raw")
         os.makedirs(raw_dir, exist_ok=True)
         raw_path = os.path.join(raw_dir, "一堂作业正文-%s.json" % today)
         raw_data = {
@@ -367,7 +405,7 @@ def main():
                 "source": "whyai yitang homework list（只读，%d 页 /api/answer/list）" % page_count,
                 "itemCount": len(raw_items),
                 "note": "字段为接口原样返回（lessonName/score/isExcellentWork/answer/textCount/"
-                        "commented/completed/rewardCode/editTime）。派生结构化清单见上级目录 一堂作业评分清单.json。",
+                        "commented/completed/rewardCode/editTime）。派生结构化清单见上级目录 %s.json。" % DATA_NAME,
             },
             "items": raw_items,
         }
@@ -376,12 +414,10 @@ def main():
         print("写入: %s（正文全文 %d 条，%d 字）"
               % (raw_path, len(raw_items), sum(i.get("textCount") or 0 for i in raw_items)))
 
-    write_launchers(args.target)
-
     if args.serve:
-        serve_in_background(args.target)
+        serve_in_background(data_dir)
 
-    print("完成。快照 %s：%d 条作业。" % (today, len(rows)))
+    print("完成。快照 %s：%d 条作业 → %s" % (today, len(rows), data_dir))
     return 0
 
 

@@ -7,25 +7,28 @@ triggers:
   - 刷新作业清单
   - 作业评分报告
   - homework snapshot
-version: 1.1.0
+version: 1.2.0
 author: WingSky
 ---
 
 # 作业评分快照（yitang-homework-snapshot）
 
-一条命令把你在「一堂」的**全部作业评分**拉到本地，产出两个文件（默认在当前目录）：
+一条命令把你在「一堂」的**全部作业评分**拉到本地。**关注点分离**——程序与前端在技能内，个人数据只写数据目录：
 
-| 文件 | 角色 |
+| 位置 | 内容 |
 |---|---|
-| `一堂作业评分清单.json` | **数据真相源**：`meta`（快照日期）+ `account`（账户口径）+ `rows[]`（逐条作业） |
-| `一堂作业评分清单.html` | **自包含工作台**：评分分布、关键词搜索、3/4/5/6 分与未评分筛选、小屏自动卡片化；内嵌快照可双击直开 |
+| 数据目录（`config.json` 的 `data_dir`，默认 `~/Documents/一堂作业工作台`） | **只有数据**：`一堂作业评分清单.json`（`meta` + `account` + `rows[]`），可选 `raw/` 正文归档 |
+| 技能目录/`workbench/` | **工作台前端**（评分分布、关键词搜索、3/4/5/6 分与未评分筛选、小屏卡片化）+ 双击启动入口 |
+| 技能目录/`scripts/`、`assets/` | 拉取脚本、本地服务启动器、工作台模板 |
+
+数据目录一次配置即可（`config.json` 的 `data_dir`；相对路径按技能目录解析，便于随仓库跨机同步），也可用 `--target` 或环境变量 `YITANG_HOMEWORK_DATA_DIR` 覆盖。
 
 本技能**自包含、不依赖其他技能**：只调用本地已安装的 `whyai` CLI（whyai-cli 公开技能是可选补充，非必需）。
 
 ## 前置条件（内嵌环境核对规则）
 
 1. **已安装并登录 whyai CLI**（安装与登录见官方 <https://ai.yitang.top/cli>；登录命令 `whyai login --gateway https://ai.yitang.top`，正式环境）。
-2. **版本基线 `0.5.7`**：脚本运行前核对 `whyai --version`，与基线不一致会**拒绝执行**——版本变化可能改变命令行为与数据边界，先人工确认变化内容，确认无碍后加 `--skip-env-check`。
+2. **版本基线 `0.5.8`**：脚本运行前核对 `whyai --version`，与基线不一致会**拒绝执行**——版本变化可能改变命令行为与数据边界，先人工确认变化内容，确认无碍后加 `--skip-env-check`。
 3. **登录态/Gateway**：脚本核对 `whyai status --json` 必须为 `logged_in: true`、`gateway: https://ai.yitang.top`、`environment: prod`。
 
 ### 安全边界（保密模式，内嵌）
@@ -38,8 +41,6 @@ author: WingSky
 ## 使用（两段式：先检查，确认后才写入）
 
 ```bash
-cd 你想存放数据的目录
-
 # 第一段：环境核对 + 只读拉取 + 出报告，**不写任何文件**
 python3 <技能目录>/scripts/refresh_homework.py
 
@@ -48,32 +49,34 @@ python3 <技能目录>/scripts/refresh_homework.py
 # 第二段：用户确认后才写入，并直接拉起后台服务 + 打开工作台
 python3 <技能目录>/scripts/refresh_homework.py --confirm --serve
 
-# 可选：顺带归档作业正文全文到 raw/
+# 可选：顺带归档作业正文全文到 数据目录/raw/
 python3 <技能目录>/scripts/refresh_homework.py --confirm --with-raw
 ```
 
 **确认门禁（硬规则）**：`--confirm` 表示「用户已确认全量写入」。**未经用户明确确认，不得自行加 `--confirm`**；无 `--confirm` 时脚本只做只读检查与报告。
 
-参数：`--confirm`（授权写入）、`--serve`（写入后拉起工作台）、`--target DIR`（输出目录，默认当前目录）、`--pages N`、`--with-raw`、`--no-backup`、`--skip-env-check`。
+参数：`--confirm`（授权写入）、`--serve`（写入后拉起工作台）、`--target DIR`（覆盖数据目录）、`--pages N`、`--with-raw`、`--no-backup`、`--skip-env-check`。
 
-**脚本自动完成**：whyai 发现（`WHYAI_BIN` → `PATH` → macOS `~/.local/bin` → Windows `%LOCALAPPDATA%\WhyAI\bin`）→ 环境核对 → 分页拉取去重 → 与旧数据对比 → （确认后）原子写 JSON（旧文件存 `.bak`）→ 工作台生成：目标目录**没有** HTML 时从自带模板实例化；**已有**则仅替换其 `<script id="seed">` 块（其余人工修改保留）→ 生成双击启动入口 → 可选拉起后台服务。
+**脚本自动完成**：whyai 发现（`WHYAI_BIN` → `PATH` → macOS `~/.local/bin` → Windows `%LOCALAPPDATA%\WhyAI\bin`）→ 环境核对 → 分页拉取去重 → 与旧数据对比 → （确认后）原子写数据目录 JSON（旧文件存 `.bak`）→ 在技能内 `workbench/` 生成工作台前端（空 seed）+ 双击启动入口 → 可选拉起后台服务。
 
 ## 工作台怎么用
 
-**推荐：让技能拉起后台服务**（`--serve`）：自动选空闲端口启动本地静态服务并打开浏览器，此时页面**真正读取同名 JSON**，数据源与 JSON 始终一致。停止服务：`python3 <技能目录>/scripts/start_workbench.py --dir <数据目录> --stop`。
+**推荐：让技能拉起后台服务**（`--serve`）：自动选空闲端口启动本地服务并打开浏览器，此时页面**真正读取数据目录的 JSON**，数据源与 JSON 始终一致。停止服务：`python3 <技能目录>/scripts/start_workbench.py --stop`。
 
 **随时手动打开**：
 
 ```bash
-python3 <技能目录>/scripts/start_workbench.py --dir <数据目录>   # 前台服务 + 自动开浏览器，Ctrl+C 停止
+python3 <技能目录>/scripts/start_workbench.py        # 前台服务 + 自动开浏览器，Ctrl+C 停止
 ```
-数据目录里也会生成双击入口：macOS `start-workbench.command`、Windows `start-workbench.bat`。
+也可双击 `workbench/start-workbench.command`（macOS）/ `workbench/start-workbench.bat`（Windows）。
+
+服务是**双根**的：请求先在工作台根（技能内）找，找不到再回落到数据根——前端与数据无需同目录。只监听 `127.0.0.1`。
 
 | 打开方式 | 效果 |
 |---|---|
-| 后台/前台本地服务 | **自动读取旁边 JSON**（状态条显示「已加载外部 JSON」）——数据源唯一 |
-| 双击 HTML（`file://`） | 只显示**内嵌快照**（浏览器拦截读取旁边 JSON）；改了 JSON 不生效 |
-| HTML 里「导入 JSON」按钮 | 任何环境可用：手动选 JSON 文件，读完刷新整页 |
+| 本地服务（推荐） | **自动读取数据目录 JSON**（状态条显示「已加载外部 JSON」）——数据源唯一 |
+| 双击技能内 HTML（`file://`） | 技能内工作台是**空 seed**，会提示「请用工作台启动器打开」；不显示个人数据（个人数据不在技能里） |
+| HTML 里「导入 JSON」按钮 | 任何环境可用：手动选数据目录的 JSON，读完刷新整页 |
 
 ## 数据契约（手工填写也支持）
 
@@ -103,6 +106,7 @@ python3 <技能目录>/scripts/start_workbench.py --dir <数据目录>   # 前�
 
 ## 边界
 
-- 只写目标目录下 `一堂作业评分清单.json` / `.html`（及 `.bak`）、`raw/` 归档、两个启动入口，以及服务运行时产生的 `.workbench-server.pid` / `.workbench-server.log` 点文件；不碰其他文件；删除/重命名产物由用户决定。
+- 只写两处：**数据目录**的 `一堂作业评分清单.json`（及 `.bak`、可选 `raw/`）；**技能目录**的 `workbench/`（工作台前端、启动入口、服务点文件，且带 `.gitignore` 屏蔽点文件）。不碰其他文件；删除/重命名产物由用户决定。
+- **个人数据只落在数据目录**：技能目录内的工作台是空 seed，避免个人数据进入版本库或随技能分发外流。
 - 后台服务只监听 `127.0.0.1`，不对外网暴露；不需要时用 `--stop` 关闭。
 - 如需 whyai CLI 更完整的命令路由、Partner 体系与操作细节说明，可配合同仓的 `whyai-cli` 公开技能（可选，非依赖）。
