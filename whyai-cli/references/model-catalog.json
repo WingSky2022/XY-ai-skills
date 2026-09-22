@@ -24,7 +24,7 @@
       "续用已有会话（-c <id>）不传 --model：payload 会带上该字段且服务端行为未验证，保守做法是保持会话原模型不变",
       "conversations create（预锚）若不立刻发消息，也不传 --model，留待首次 chat 时按本策略决定"
     ],
-    "guard": "两个 alias 若在本清单中消失或失去关键能力，scripts/模型清单校验 会报 P0 —— 默认策略失效，必须先修策略再调用"
+    "guard": "调用前可用 `whyai models list --json` 核对：若默认 alias 已不在清单里、或不再具备图片能力，说明本清单已过期 —— **换用清单内可用的同类模型并告知用户**，不要沿用旧 alias 硬试。"
   },
   "model_count": 6,
   "models": [
