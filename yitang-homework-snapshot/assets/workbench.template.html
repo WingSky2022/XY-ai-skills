@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>一堂作业评分清单</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #ffffff; --line: #e6e8ec;
+    --tx: #1f2329; --tx2: #5b6169; --tx3: #8a9099;
+    --up: #c62828; --accent: #2a6ff0; --warn: #a96a12; --warnbg: #fff8ec;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--tx);
+    font: 14px/1.6 -apple-system, "PingFang SC", "Helvetica Neue", Arial, sans-serif; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 28px 20px 60px; }
+  .hdr { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .hdr svg { flex: none; }
+  h1 { font-size: 22px; margin: 0; letter-spacing: .3px; }
+  .sub { color: var(--tx3); font-size: 13px; margin-bottom: 10px; }
+  .srcbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 9px 12px; margin-bottom: 14px; font-size: 12.5px; color: var(--tx2); }
+  .srcbar .dot { width: 8px; height: 8px; border-radius: 50%; background: #f0a33b; flex: none; }
+  .srcbar.ok .dot { background: #2e9e5b; }
+  .srcbar .msg { flex: 1; min-width: 200px; }
+  .srcbar button { padding: 6px 12px; border: 1px solid var(--line); background: #fff;
+    border-radius: 7px; font-size: 12.5px; color: var(--tx2); cursor: pointer; }
+  .srcbar button:hover { border-color: #c9ced6; }  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .card .k { color: var(--tx3); font-size: 12px; }
+  .card .v { font-size: 26px; font-weight: 650; margin-top: 2px; }
+  .card .v small { font-size: 13px; font-weight: 400; color: var(--tx3); margin-left: 3px; }
+  .card.hi .v { color: var(--up); }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 16px; }
+  .panel h2 { font-size: 14px; margin: 0 0 12px; color: var(--tx2); font-weight: 600; }
+  .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; }
+  .bar-label { width: 58px; font-size: 13px; color: var(--tx2); text-align: right; flex: none; }
+  .bar-track { flex: 1; height: 12px; background: #eef0f3; border-radius: 6px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 6px; }
+  .bar-num { width: 52px; font-size: 13px; color: var(--tx3); flex: none; }
+  .bar-fill.sc6, .pill.sc6 { background: #c62828; }
+  .bar-fill.sc5, .pill.sc5 { background: #e5533d; }
+  .bar-fill.sc4, .pill.sc4 { background: #f0a33b; }
+  .bar-fill.sc3, .pill.sc3 { background: #9aa6b2; }
+  .bar-fill.sc0, .pill.sc0 { background: #dfe3e8; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+  input[type=search] { flex: 1; min-width: 180px; padding: 8px 12px; border: 1px solid var(--line);
+    border-radius: 8px; font-size: 13px; background: #fbfcfd; color: var(--tx); }
+  input[type=search]:focus { outline: 2px solid rgba(42,111,240,.25); border-color: var(--accent); }
+  .flt { padding: 7px 13px; border: 1px solid var(--line); background: #fff; border-radius: 8px;
+    font-size: 13px; color: var(--tx2); cursor: pointer; }
+  .flt:hover { border-color: #c9ced6; }
+  .flt.on { background: var(--tx); border-color: var(--tx); color: #fff; }
+  table { width: 100%; border-collapse: collapse; background: var(--card);
+    border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  th, td { padding: 9px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  th { background: #fafbfc; font-size: 12px; color: var(--tx2); font-weight: 600;
+    position: sticky; top: 0; z-index: 1; }
+  tbody tr:hover { background: #fafbfd; }
+  tbody tr:last-child td { border-bottom: 0; }
+  .c-idx, .c-score, .c-wc, .c-date { white-space: nowrap; }
+  .c-idx { color: var(--tx3); font-size: 12px; width: 44px; }
+  .c-wc, .c-date { color: var(--tx2); font-size: 12.5px; }
+  .c-title { line-height: 1.5; }
+  .pill { display: inline-block; min-width: 24px; text-align: center; color: #fff;
+    border-radius: 6px; padding: 1px 7px; font-size: 12.5px; font-weight: 600; }
+  .tag { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 4px;
+    font-size: 11px; line-height: 17px; vertical-align: 1px; }
+  .tag-full { background: #fdeaea; color: #c62828; }
+  .tag-exc { background: #fff4e3; color: #a96a12; }
+  .tag-cmt { background: #eef2fb; color: #4a6a9a; }
+  .empty { padding: 26px; text-align: center; color: var(--tx3); display: none; }
+  .lcards { display: none; }
+  .lc-item { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 11px 13px; margin-bottom: 9px; }
+  .lc-top { display: flex; gap: 8px; align-items: flex-start; }
+  .lc-top .pill { flex: none; margin-top: 2px; }
+  .lc-title { line-height: 1.5; }
+  .lc-meta { display: flex; flex-wrap: wrap; gap: 7px; align-items: center;
+    margin-top: 7px; color: var(--tx3); font-size: 12px; }
+  .lc-meta .tag { margin-left: 0; }
+  .notes { margin: 0; padding-left: 20px; color: var(--tx2); font-size: 13px; line-height: 1.85; }
+  .notes li { margin-bottom: 4px; }
+  .notes b { color: var(--tx); }
+  footer { margin-top: 16px; color: var(--tx3); font-size: 12px; line-height: 1.8; }
+  code { background: #eef0f3; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  @media (max-width: 1000px) {
+    input[type=search] { font-size: 16px; }
+    .flt, .srcbar button { min-height: 44px; padding: 0 15px; }
+  }
+  @media (max-width: 760px) {
+    body { padding-bottom: 70px; }
+    .wrap { padding: 18px 13px 40px; }
+    h1 { font-size: 19px; }
+    table { display: none; }
+    .lcards { display: block; }
+    .cards { grid-template-columns: repeat(2, 1fr); gap: 9px; }
+    .card { padding: 11px 12px; }
+    .card .v { font-size: 21px; }
+    .card .v small { display: block; margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hdr">
+    <svg width="28" height="26" viewBox="0 0 28 26" aria-hidden="true">
+      <rect x="1" y="16" width="5" height="9" rx="1.5" fill="#9aa6b2"></rect>
+      <rect x="8" y="11" width="5" height="14" rx="1.5" fill="#f0a33b"></rect>
+      <rect x="15" y="6" width="5" height="19" rx="1.5" fill="#e5533d"></rect>
+      <rect x="22" y="1" width="5" height="24" rx="1.5" fill="#c62828"></rect>
+    </svg>
+    <h1>一堂作业评分清单</h1>
+  </div>
+  <div class="sub" id="sub"></div>
+
+  <div class="srcbar" id="srcbar">
+    <span class="dot"></span>
+    <span class="msg" id="srcmsg"></span>
+    <button id="retry" type="button">重读 JSON</button>
+    <button id="import" type="button">导入 JSON…</button>
+  </div>
+
+  <div class="cards">
+    <div class="card hi"><div class="k">账户总学分</div><div class="v" id="v-account">—</div></div>
+    <div class="card"><div class="k">作业总数</div><div class="v" id="v-count">—</div></div>
+    <div class="card"><div class="k">逐条评分合计</div><div class="v" id="v-sum">—</div></div>
+    <div class="card"><div class="k">满分（6 分）</div><div class="v" id="v-full">—</div></div>
+    <div class="card"><div class="k">已评分 / 未评分</div><div class="v" id="v-graded">—</div></div>
+    <div class="card"><div class="k">平均评分（按已评分）</div><div class="v" id="v-avg">—</div></div>
+  </div>
+
+  <div class="panel">
+    <h2>评分分布</h2>
+    <div id="dist"></div>
+  </div>
+
+  <div class="toolbar">
+    <input type="search" id="q" placeholder="搜索课程 / 作业标题…">
+    <button class="flt on" data-f="all" type="button">全部</button>
+    <button class="flt" data-f="6" type="button">6 分</button>
+    <button class="flt" data-f="5" type="button">5 分</button>
+    <button class="flt" data-f="4" type="button">4 分</button>
+    <button class="flt" data-f="3" type="button">3 分</button>
+    <button class="flt" data-f="0" type="button">未评分</button>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>#</th><th>课程 / 作业标题</th><th>评分</th><th>字数</th><th>提交日期</th></tr>
+    </thead>
+    <tbody id="tb"></tbody>
+  </table>
+  <div class="lcards" id="lcards"></div>
+  <div class="empty" id="empty">没有匹配的记录</div>
+
+  <footer>
+    <div class="panel" style="margin-top:0">
+      <h2>口径说明（必读）</h2>
+      <ul class="notes">
+        <li>「评分」是一堂对单次作业的学分评定，取值 <b>3 / 4 / 5 / 6</b>，<b>6 分为满分</b>；<code>—</code> 表示该条尚无评分（当前 <span id="n-ungraded">0</span> 条）。</li>
+        <li><b>逐条评分合计 <span id="n-sum">0</span> 分 ≠ 账户总学分 <span id="n-account">0</span></b>。账户侧另有「额外学分」<code>scoreExtra=<span id="n-extra">0</span></code>，且学分还包含非作业来源；<b>正式口径请以账户学分为准</b>，本清单只反映作业评分本身。</li>
+        <li>官方「满分作业 <span id="n-operfect">0</span> 条」与本清单 6 分条数对照；官方「作业总数」与本清单条数应一致，不一致说明数据待更新。</li>
+        <li>官方「优秀作业 <span id="n-oexc">0</span> 条」与本清单 <code>excellent=true</code> 的 <b><span id="n-exc">0</span> 条</b>可能不一致；清单中的优秀标记历史上只出现在 5 分与 6 分作业上，差异原因无法从返回字段判定，<b>以官方页面为准</b>。</li>
+      </ul>
+    </div>
+    数据源：一堂只读接口 <code>/api/answer/list</code> · 快照日期 <span id="n-date">—</span> ·
+    数据真相源：旁边同名 <code>.json</code>（改 JSON 后点「重读 JSON」，或用本地服务 / 「导入 JSON」加载）。
+  </footer>
+</div>
+
+<input type="file" id="filein" accept=".json,application/json" style="display:none">
+<script id="seed" type="application/json">__SEED__</script>
+<script>
+(function () {
+  'use strict';
+  var FILE = '__NAME__.json';
+
+  function byId(id) { return document.getElementById(id); }
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== null && text !== undefined) e.textContent = String(text);
+    return e;
+  }
+
+  function rowMatch(node, kw) {
+    var okF = flt === 'all' || node.getAttribute('data-score') === flt;
+    var okK = !kw || node.getAttribute('data-text').indexOf(kw) !== -1;
+    return okF && okK;
+  }
+
+  var rows = [];   // 当前渲染的行（已排序）
+  var flt = 'all';
+  var qEl = byId('q');
+
+  function validate(d) {
+    if (!d || typeof d !== 'object') throw new Error('数据不是对象');
+    if (!Array.isArray(d.rows)) throw new Error('rows 不是数组');
+    if (!d.rows.length) throw new Error('rows 为空');
+    for (var i = 0; i < d.rows.length; i++) {
+      var r = d.rows[i];
+      if (typeof r.title !== 'string' || typeof r.score !== 'number')
+        throw new Error('第 ' + (i + 1) + ' 行缺少 title / score');
+    }
+    if (!d.account || typeof d.account.score !== 'number')
+      throw new Error('缺少 account.score');
+    return true;
+  }
+
+  function scoreClass(s) {
+    return s === 6 ? 'sc6' : s === 5 ? 'sc5' : s === 4 ? 'sc4' : s === 3 ? 'sc3' : 'sc0';
+  }
+
+  function setSource(msg, ok) {
+    byId('srcmsg').textContent = msg;
+    byId('srcbar').className = 'srcbar' + (ok ? ' ok' : '');
+  }
+
+  function render(d) {
+    validate(d);
+    var acc = d.account || {};
+    rows = d.rows.slice().sort(function (a, b) {
+      return (b.score - a.score) || String(b.date).localeCompare(String(a.date));
+    });
+
+    var ungraded = 0, sum = 0, full = 0, exc = 0;
+    var dist = { '6': 0, '5': 0, '4': 0, '3': 0, '0': 0 };
+    rows.forEach(function (r) {
+      var s = r.score || 0;
+      dist[String(s)] = (dist[String(s)] || 0) + 1;
+      if (s === 0) ungraded++; else sum += s;
+      if (s === 6) full++;
+      if (r.excellent) exc++;
+    });
+    var graded = rows.length - ungraded;
+    var avg = graded ? (sum / graded) : 0;
+
+    byId('v-account').textContent = acc.score;
+    byId('v-count').textContent = rows.length;
+    byId('v-sum').textContent = sum;
+    byId('v-full').textContent = full;
+    byId('v-graded').textContent = graded;
+    byId('v-avg').textContent = graded ? avg.toFixed(2) : '—';
+
+    byId('n-ungraded').textContent = ungraded;
+    byId('n-sum').textContent = sum;
+    byId('n-account').textContent = acc.score;
+    byId('n-extra').textContent = acc.scoreExtra;
+    byId('n-operfect').textContent = acc.officialPerfect;
+    byId('n-oexc').textContent = acc.officialExcellent;
+    byId('n-exc').textContent = exc;
+    byId('n-date').textContent = (d.meta && d.meta.snapshotDate) || '—';
+    byId('sub').textContent = '快照 ' + ((d.meta && d.meta.snapshotDate) || '—') +
+      ' · 共 ' + rows.length + ' 条作业';
+
+    var distEl = byId('dist');
+    distEl.textContent = '';
+    var maxc = Math.max(1, dist['6'], dist['5'], dist['4'], dist['3'], dist['0']);
+    [['6', '6 分'], ['5', '5 分'], ['4', '4 分'], ['3', '3 分'], ['0', '未评分']].forEach(function (p) {
+      var c = dist[p[0]] || 0;
+      var line = el('div', 'bar-row');
+      line.appendChild(el('div', 'bar-label', p[1]));
+      var track = el('div', 'bar-track');
+      var fill = el('div', 'bar-fill ' + scoreClass(Number(p[0])));
+      fill.style.width = (c / maxc * 100).toFixed(1) + '%';
+      track.appendChild(fill);
+      line.appendChild(track);
+      line.appendChild(el('div', 'bar-num', c + ' 条'));
+      distEl.appendChild(line);
+    });
+
+    var tb = byId('tb'), lc = byId('lcards');
+    tb.textContent = ''; lc.textContent = '';
+    rows.forEach(function (r, i) {
+      var s = r.score || 0;
+      var pillTxt = s === 0 ? '—' : String(s);
+      var tr = el('tr');
+      tr.setAttribute('data-score', String(s));
+      tr.setAttribute('data-text', r.title.toLowerCase());
+      tr.appendChild(el('td', 'c-idx', i + 1));
+      var tdT = el('td', 'c-title');
+      tdT.appendChild(document.createTextNode(r.title));
+      if (s === 6) tdT.appendChild(el('span', 'tag tag-full', '满分'));
+      if (r.excellent) tdT.appendChild(el('span', 'tag tag-exc', '优秀'));
+      if (r.commented) tdT.appendChild(el('span', 'tag tag-cmt', '已点评'));
+      tr.appendChild(tdT);
+      var tdS = el('td', 'c-score');
+      tdS.appendChild(el('span', 'pill ' + scoreClass(s), pillTxt));
+      tr.appendChild(tdS);
+      tr.appendChild(el('td', 'c-wc', r.wordCount || 0));
+      tr.appendChild(el('td', 'c-date', r.date || ''));
+      tb.appendChild(tr);
+
+      var card = el('div', 'lc-item');
+      card.setAttribute('data-score', String(s));
+      card.setAttribute('data-text', r.title.toLowerCase());
+      var top = el('div', 'lc-top');
+      top.appendChild(el('span', 'pill ' + scoreClass(s), pillTxt));
+      top.appendChild(el('span', 'lc-title', r.title));
+      card.appendChild(top);
+      var meta = el('div', 'lc-meta');
+      meta.appendChild(el('span', 'lc-idx', '#' + (i + 1)));
+      if (s === 6) meta.appendChild(el('span', 'tag tag-full', '满分'));
+      if (r.excellent) meta.appendChild(el('span', 'tag tag-exc', '优秀'));
+      if (r.commented) meta.appendChild(el('span', 'tag tag-cmt', '已点评'));
+      meta.appendChild(el('span', 'lc-wc', (r.wordCount || 0) + ' 字'));
+      meta.appendChild(el('span', 'lc-date', r.date || ''));
+      card.appendChild(meta);
+      lc.appendChild(card);
+    });
+
+    apply();
+  }
+
+  function apply() {
+    var kw = qEl.value.trim().toLowerCase();
+    var shown = 0;
+    Array.prototype.forEach.call(byId('tb').querySelectorAll('tr'), function (tr) {
+      tr.style.display = rowMatch(tr, kw) ? '' : 'none';
+    });
+    Array.prototype.forEach.call(byId('lcards').querySelectorAll('.lc-item'), function (c) {
+      var ok = rowMatch(c, kw);
+      c.style.display = ok ? '' : 'none';
+      if (ok) shown++;
+    });
+    byId('empty').style.display = shown ? 'none' : 'block';
+  }
+
+  qEl.addEventListener('input', apply);
+  Array.prototype.forEach.call(document.querySelectorAll('.flt'), function (b) {
+    b.addEventListener('click', function () {
+      Array.prototype.forEach.call(document.querySelectorAll('.flt'), function (x) { x.classList.remove('on'); });
+      b.classList.add('on');
+      flt = b.getAttribute('data-f');
+      apply();
+    });
+  });
+
+  function tryFetch() {
+    setSource('正在读取外部 JSON（' + FILE + '）…', false);
+    fetch(FILE + '?t=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) {
+        if (!r.ok) throw new Error('net:HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function (j) {
+        try {
+          render(j);
+          setSource('已加载外部 JSON · 快照 ' + ((j.meta && j.meta.snapshotDate) || '—'), true);
+        } catch (e) {
+          setSource('外部 JSON 内容有误（' + e.message + '），仍显示内嵌快照。可修正后点「重读 JSON」', false);
+        }
+      })
+      .catch(function (err) {
+        var m = String(err && err.message || err);
+        var isNet = m.indexOf('net:') === 0 || m.indexOf('Failed to fetch') !== -1 ||
+                    m.indexOf('NetworkError') !== -1 || (err instanceof TypeError);
+        if (isNet) {
+          setSource('未读到外部 JSON（双击 file:// 打开时浏览器会拦截），当前显示内嵌快照。可点「导入 JSON」手动选择，或经本地服务打开后自动读取。', false);
+        } else {
+          setSource('外部 JSON 解析失败（' + m + '），仍显示内嵌快照。可修正后点「重读 JSON」。', false);
+        }
+      });
+  }
+  byId('retry').addEventListener('click', tryFetch);
+  byId('import').addEventListener('click', function () { byId('filein').click(); });
+  byId('filein').addEventListener('change', function () {
+    var f = this.files && this.files[0];
+    if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function () {
+      try {
+        var j = JSON.parse(String(rd.result));
+        render(j);
+        setSource('已导入本地 JSON：' + f.name + ' · 快照 ' + ((j.meta && j.meta.snapshotDate) || '—'), true);
+      } catch (e) {
+        setSource('导入失败：' + e.message, false);
+      }
+    };
+    rd.onerror = function () { setSource('导入失败：文件读取错误', false); };
+    rd.readAsText(f, 'utf-8');
+    this.value = '';
+  });
+
+  // 启动：先渲染内嵌快照（保证双击打开即有内容），再尝试外部 JSON 增强
+  var seed = JSON.parse(byId('seed').textContent);
+  render(seed);
+  tryFetch();
+
+  // 供测试 / 控制台使用
+  window.__yitangRender = function (obj) { render(obj); };
+  window.__yitangState = function () { return rows; };
+})();
+</script>
+</body>
+</html>
