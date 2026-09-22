@@ -20,9 +20,11 @@ import argparse
 import http.server
 import json
 import os
+import shutil
 import signal
 import socket
 import socketserver
+import subprocess
 import sys
 import threading
 import urllib.parse
@@ -36,6 +38,28 @@ SKILL_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
 WORKBENCH_DIR = os.path.join(SKILL_ROOT, "workbench")
 CONFIG_PATH = os.path.join(SKILL_ROOT, "config.json")
 DEFAULT_DATA_DIR = os.path.expanduser("~/Documents/一堂作业工作台")
+
+# 作业详情接口（v1.4.0）：GET /__api/homework/<id> → whyai yitang homework show（只读）
+# 背景：列表接口不返回题目与第 2+ 题作答，工作台详情弹窗需要单条详情补全。
+# 安全边界：仅监听 127.0.0.1；id 必须为纯数字；只调用只读子命令，无任何写操作。
+API_PREFIX = "/__api/homework/"
+_detail_cache = {}
+
+
+def find_whyai():
+    cand = os.environ.get("WHYAI_BIN")
+    if cand and os.path.exists(cand):
+        return cand
+    found = shutil.which("whyai")
+    if found:
+        return found
+    home = os.path.expanduser("~")
+    for p in (os.path.join(home, ".local", "bin", "whyai"),
+              os.path.join(home, ".local", "bin", "whyai.exe"),
+              os.path.join(os.environ.get("LOCALAPPDATA", ""), "WhyAI", "bin", "whyai.exe")):
+        if p and os.path.exists(p):
+            return p
+    return None
 
 
 class QuietHandler(http.server.SimpleHTTPRequestHandler):
@@ -102,6 +126,51 @@ def make_handler(roots, quiet):
                     return cand
             return os.path.join(roots[0], rel)
 
+        def send_json(self, code, obj):
+            body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
+            self.send_response(code)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_GET(self):
+            p = urllib.parse.urlparse(self.path).path
+            if p.startswith(API_PREFIX):
+                self.handle_homework_api(p[len(API_PREFIX):])
+                return
+            super().do_GET()
+
+        def handle_homework_api(self, hid):
+            """只读代理 whyai yitang homework show；id 白名单为纯数字，结果驻内存缓存。"""
+            hid = urllib.parse.unquote(hid, errors="surrogatepass").strip("/")
+            if not hid.isdigit():
+                return self.send_json(400, {"ok": False, "error": "作业 id 非法"})
+            if hid in _detail_cache:
+                return self.send_json(200, _detail_cache[hid])
+            whyai = find_whyai()
+            if not whyai:
+                return self.send_json(500, {"ok": False, "error": "未找到 whyai CLI，无法在线拉取作业详情"})
+            try:
+                proc = subprocess.run(
+                    [whyai, "yitang", "homework", "show", "--param", "id=" + hid, "--json"],
+                    capture_output=True, text=True, timeout=90)
+            except subprocess.TimeoutExpired:
+                return self.send_json(504, {"ok": False, "error": "whyai 拉取超时（90s）"})
+            except Exception as e:
+                return self.send_json(500, {"ok": False, "error": "whyai 调用失败：%s" % e})
+            try:
+                out = json.loads(proc.stdout)
+            except Exception:
+                return self.send_json(502, {"ok": False,
+                                            "error": "whyai 输出不可解析：" + (proc.stderr or proc.stdout or "")[:120]})
+            if proc.returncode != 0 or not out.get("ok"):
+                msg = out.get("error") or proc.stderr or ("exit %d" % proc.returncode)
+                return self.send_json(502, {"ok": False, "error": str(msg)[:160]})
+            _detail_cache[hid] = out  # 只缓存成功结果，失败可重试
+            self.send_json(200, out)
+
         def log_message(self, fmt, *args):
             if not quiet:
                 base_cls.log_message(self, fmt, *args)
@@ -152,7 +221,8 @@ def serve(data_dir, port=None, open_browser=True, print_url=False, quiet=False):
     handler = make_handler(roots, quiet)
     socketserver.TCPServer.allow_reuse_address = True
     try:
-        httpd = socketserver.TCPServer(("127.0.0.1", port), handler)
+        # ThreadingHTTPServer：详情接口要同步等 whyai（约 1-2s），多线程避免卡住页面静态请求
+        httpd = http.server.ThreadingHTTPServer(("127.0.0.1", port), handler)
     except OSError as e:
         print("[STOP] 端口 %d 不可用：%s（可换 --port 或省略以自动选端口）" % (port, e))
         return 2
@@ -169,6 +239,7 @@ def serve(data_dir, port=None, open_browser=True, print_url=False, quiet=False):
     print("工作台服务已就绪：%s" % url, flush=True)
     print("  工作台前端：%s" % WORKBENCH_DIR, flush=True)
     print("  数据目录：%s（页面将自动读取 %s.json）" % (data_dir, DATA_NAME), flush=True)
+    print("  详情接口：GET /__api/homework/<id>（只读，代理 whyai yitang homework show）", flush=True)
     print("停止：Ctrl+C（或 python3 start_workbench.py --stop）", flush=True)
     if open_browser:
         threading.Timer(0.4, lambda: webbrowser.open(url)).start()

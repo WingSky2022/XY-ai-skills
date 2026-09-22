@@ -85,6 +85,57 @@
   .notes b { color: var(--tx); }
   footer { margin-top: 16px; color: var(--tx3); font-size: 12px; line-height: 1.8; }
   code { background: #eef0f3; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  .hint { color: var(--tx3); font-size: 12.5px; }
+  .rawbar { display: none; font-size: 12px; color: var(--tx3);
+    margin: -6px 0 12px; padding: 0 4px; }
+  .rawbar.show { display: block; }
+  .rawbar.warn { color: var(--warn); }
+  tbody tr, .lc-item { cursor: pointer; }
+  .lc-chev { margin-left: auto; color: var(--tx3); flex: none; align-self: center; display: flex; }
+  .modal { position: fixed; inset: 0; z-index: 60; display: flex;
+    align-items: center; justify-content: center; padding: 18px; }
+  .modal[hidden] { display: none; }
+  .m-back { position: absolute; inset: 0; background: rgba(31,35,41,.45); }
+  .m-card { position: relative; background: var(--card); border-radius: 14px; width: 100%;
+    max-width: 760px; max-height: 88vh; display: flex; flex-direction: column;
+    box-shadow: 0 12px 40px rgba(31,35,41,.22); overflow: hidden; }
+  .m-head { display: flex; gap: 10px; align-items: flex-start;
+    padding: 14px 16px 11px; border-bottom: 1px solid var(--line); }
+  .m-head .pill { flex: none; margin-top: 3px; }
+  .m-titlewrap { flex: 1; min-width: 0; }
+  .m-title { font-size: 15px; font-weight: 600; line-height: 1.5; word-break: break-word; }
+  .m-meta { color: var(--tx3); font-size: 12px; margin-top: 3px; }
+  .m-x { flex: none; width: 34px; height: 34px; border: 1px solid var(--line); background: #fff;
+    border-radius: 8px; cursor: pointer; color: var(--tx2); display: flex;
+    align-items: center; justify-content: center; padding: 0; }
+  .m-x:hover { border-color: #c9ced6; }
+  .m-body { padding: 14px 16px; overflow: auto; white-space: pre-wrap; word-break: break-word;
+    line-height: 1.85; font-size: 14px; color: var(--tx); flex: 1; min-height: 0; }
+  .m-body.empty-raw { color: var(--tx3); font-size: 13px; }
+  .m-foot { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; flex: none;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); }
+  .m-hint { flex: 1; color: var(--tx3); font-size: 12px; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .m-foot button { padding: 8px 14px; border: 1px solid var(--line); background: #fff;
+    border-radius: 8px; font-size: 13px; color: var(--tx2); cursor: pointer; }
+  .m-foot button:hover { border-color: #c9ced6; }
+  .m-link { padding: 8px 14px; border: 1px solid var(--line); background: #fff;
+    border-radius: 8px; font-size: 13px; color: var(--tx2); cursor: pointer;
+    text-decoration: none; display: inline-flex; align-items: center; gap: 5px; flex: none; }
+  .m-link:hover { border-color: #c9ced6; }
+  .q-sec { margin-bottom: 18px; }
+  .q-label { font-size: 11px; font-weight: 600; color: var(--tx3);
+    letter-spacing: 1px; margin-bottom: 4px; }
+  .q-label-a { margin-top: 12px; color: var(--accent); }
+  .q-label-c { margin-top: 12px; color: var(--warn); }
+  .q-title { font-size: 14.5px; font-weight: 600; line-height: 1.6; }
+  .q-hint { font-size: 13px; color: var(--tx2); background: #f7f8fa;
+    border-radius: 8px; padding: 8px 10px; margin-top: 6px; line-height: 1.7; }
+  .q-answer { margin-top: 4px; line-height: 1.85; }
+  .q-none { color: var(--tx3); }
+  .q-correction { font-size: 13px; color: var(--tx2); background: var(--warnbg);
+    border-radius: 8px; padding: 8px 10px; margin-top: 4px; line-height: 1.7; }
+  .m-loading { color: var(--tx3); }
   @media (max-width: 1000px) {
     input[type=search] { font-size: 16px; }
     .flt, .srcbar button { min-height: 44px; padding: 0 15px; }
@@ -99,6 +150,10 @@
     .card { padding: 11px 12px; }
     .card .v { font-size: 21px; }
     .card .v small { display: block; margin-left: 0; }
+    .modal { padding: 10px; align-items: flex-end; }
+    .m-card { max-height: 92vh; }
+    .m-x { width: 44px; height: 44px; }
+    .m-foot button { min-height: 44px; }
   }
 </style>
 </head>
@@ -121,6 +176,7 @@
     <button id="retry" type="button">重读 JSON</button>
     <button id="import" type="button">导入 JSON…</button>
   </div>
+  <div class="rawbar" id="rawbar"></div>
 
   <div class="cards">
     <div class="card hi"><div class="k">账户总学分</div><div class="v" id="v-account">—</div></div>
@@ -144,6 +200,7 @@
     <button class="flt" data-f="4" type="button">4 分</button>
     <button class="flt" data-f="3" type="button">3 分</button>
     <button class="flt" data-f="0" type="button">未评分</button>
+    <span class="hint">点击任意一行 / 卡片可查看作业正文</span>
   </div>
 
   <table>
@@ -171,6 +228,33 @@
 </div>
 
 <input type="file" id="filein" accept=".json,application/json" style="display:none">
+<input type="file" id="rawin" accept=".json,application/json" style="display:none">
+
+<div class="modal" id="modal" hidden>
+  <div class="m-back" data-close="1"></div>
+  <div class="m-card" role="dialog" aria-modal="true" aria-labelledby="m-title">
+    <div class="m-head">
+      <span class="pill sc0" id="m-pill">—</span>
+      <div class="m-titlewrap">
+        <div class="m-title" id="m-title"></div>
+        <div class="m-meta" id="m-meta"></div>
+      </div>
+      <button class="m-x" id="m-close" type="button" aria-label="关闭">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+      </button>
+    </div>
+    <div class="m-body" id="m-body"></div>
+    <div class="m-foot">
+      <span class="m-hint" id="m-hint"></span>
+      <a class="m-link" id="m-official" href="#" target="_blank" rel="noopener">官方页面
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M9 7h8v8"></path></svg>
+      </a>
+      <button id="m-rawimport" type="button">导入正文归档…</button>
+      <button id="m-copy" type="button">复制全文</button>
+    </div>
+  </div>
+</div>
+
 <script id="seed" type="application/json">__SEED__</script>
 <script>
 (function () {
@@ -194,6 +278,10 @@
   var rows = [];   // 当前渲染的行（已排序）
   var flt = 'all';
   var qEl = byId('q');
+  var rawMap = null;     // id -> raw item（正文归档，来自 raw/一堂作业正文-*.json）
+  var rawFile = '';      // 当前正文归档来源
+  var curDetail = null;  // 详情弹窗当前行
+  var detailCache = {};  // id -> homework show 详情（null = 拉取失败，避免重复请求）
 
   function validate(d) {
     if (!d || typeof d !== 'object') throw new Error('数据不是对象');
@@ -215,8 +303,59 @@
     byId('srcbar').className = 'srcbar' + (ok ? ' ok' : '');
   }
 
+  // ---- 正文归档（raw）----
+  // 展示层清洗：与 refresh_homework.py v1.2.2 的入库清洗同规则（仅影响显示，不改数据文件）。
+  // LS/PS(U+2028/2029)→空格；ZWSP/LRM/RLM/WJ/ZWNBSP/双向控制符移除；ZWJ/ZWNJ 等 emoji 组成字符保留。
+  var RE_LS = /[\u2028\u2029]/g;
+  var RE_DROP = /[\u200b\u200e\u200f\u202a-\u202e\u2060\ufeff]/g;
+  function cleanText(s) {
+    if (typeof s !== 'string') return '';
+    return s.replace(RE_LS, ' ').replace(RE_DROP, '').replace(/\n{4,}/g, '\n\n\n').trim();
+  }
+
+  function rawStatus(msg, ok) {
+    var b = byId('rawbar');
+    b.textContent = msg;
+    b.className = 'rawbar show' + (ok === false ? ' warn' : '');
+  }
+
+  function adoptRaw(j, label) {
+    rawMap = {};
+    rawFile = label || '';
+    var items = (j && j.items) || [];
+    for (var i = 0; i < items.length; i++) rawMap[items[i].id] = items[i];
+    rawStatus('正文归档已加载：' + rawFile + ' · ' + items.length + ' 条 · 点击任意一行查看全文', true);
+  }
+
+  // 候选顺序：清单 meta.rawFile → raw/一堂作业正文-<snapshotDate>.json
+  function loadRaw(d) {
+    rawMap = null; rawFile = '';
+    var meta = (d && d.meta) || {};
+    var cands = [];
+    if (meta.rawFile) cands.push(String(meta.rawFile));
+    if (meta.snapshotDate) cands.push('raw/一堂作业正文-' + meta.snapshotDate + '.json');
+    cands = cands.filter(function (v, i, a) { return a.indexOf(v) === i; });
+    if (!cands.length) {
+      rawStatus('尚无正文归档（raw/）—— 刷新时加 --with-raw 生成，或在详情弹窗里「导入正文归档…」', false);
+      return;
+    }
+    var attempt = function (k) {
+      if (k >= cands.length) {
+        rawStatus('正文归档未读到（' + cands.join('、') + '）—— file:// 打开会拦截读取，请经工作台启动器打开，或在详情弹窗里「导入正文归档…」', false);
+        return;
+      }
+      fetch(cands[k] + '?t=' + Date.now(), { cache: 'no-store' })
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function (j) { adoptRaw(j, cands[k]); })
+        .catch(function () { attempt(k + 1); });
+    };
+    attempt(0);
+  }
+
   function render(d) {
     validate(d);
+    rawMap = null; rawFile = '';
+    byId('rawbar').className = 'rawbar';
     var acc = d.account || {};
     rows = d.rows.slice().sort(function (a, b) {
       return (b.score - a.score) || String(b.date).localeCompare(String(a.date));
@@ -296,6 +435,7 @@
       tr.appendChild(el('td', 'c-wc', r.wordCount || 0));
       tr.appendChild(el('td', 'c-date', r.date || ''));
       tb.appendChild(tr);
+      tr.addEventListener('click', function () { openDetail(r); });
 
       var card = el('div', 'lc-item');
       card.setAttribute('data-score', String(s));
@@ -303,6 +443,9 @@
       var top = el('div', 'lc-top');
       top.appendChild(el('span', 'pill ' + scoreClass(s), pillTxt));
       top.appendChild(el('span', 'lc-title', r.title));
+      var chev = el('span', 'lc-chev');
+      chev.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg>';
+      top.appendChild(chev);
       card.appendChild(top);
       var meta = el('div', 'lc-meta');
       meta.appendChild(el('span', 'lc-idx', '#' + (i + 1)));
@@ -313,6 +456,7 @@
       meta.appendChild(el('span', 'lc-date', r.date || ''));
       card.appendChild(meta);
       lc.appendChild(card);
+      card.addEventListener('click', function () { openDetail(r); });
     });
 
     apply();
@@ -342,6 +486,169 @@
     });
   });
 
+  // ---- 详情弹窗 ----
+  // 数据分三层：① homework show 完整详情（题目+逐题作答+点评，经本地服务 /__api/homework/<id>）
+  //            ② raw 正文归档兜底（列表接口只含第 1 题作答）
+  //            ③ 都没有时给出引导（--with-raw / 导入正文归档）
+  function htmlToText(html) {
+    if (typeof html !== 'string') return '';
+    var ta = document.createElement('textarea');
+    ta.innerHTML = String(html)
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(p|div|li|h[1-6]|tr|blockquote)>/gi, '\n')
+      .replace(/<li[^>]*>/gi, '· ')
+      .replace(/<[^>]+>/g, '');
+    return cleanText(ta.value.replace(/[ \t]+\n/g, '\n')).trim();
+  }
+
+  function setDetailFoot(hasFull) {
+    byId('m-rawimport').style.display = hasFull ? 'none' : '';
+    if (hasFull) byId('m-copy').style.display = '';
+  }
+
+  function buildDetailText(d) {
+    var qs = (d.homework && d.homework.questions) || [];
+    var ans = d.answers || {};
+    var cor = (d.corrections && typeof d.corrections === 'object') ? d.corrections : {};
+    var out = [];
+    qs.forEach(function (q, i) {
+      out.push('【题目 ' + (i + 1) + '】' + (q.title || ''));
+      if (q.hint) out.push(cleanText(String(q.hint)));
+      out.push('【我的答题】');
+      out.push(htmlToText((ans[q.qid] || {}).html) || '（此题未作答）');
+      var ct = cleanText(String(cor[q.qid] || ''));
+      if (ct) { out.push('【老师点评】'); out.push(ct); }
+      out.push('');
+    });
+    if (typeof d.correctionsAll === 'string' && cleanText(d.correctionsAll)) {
+      out.push('【总评】');
+      out.push(cleanText(d.correctionsAll));
+    }
+    return out.join('\n').trim();
+  }
+
+  function renderDetailFull(r, d) {
+    var body = byId('m-body');
+    var qs = (d.homework && d.homework.questions) || [];
+    var ans = d.answers || {};
+    var cor = (d.corrections && typeof d.corrections === 'object') ? d.corrections : {};
+    if (!qs.length) { showRawFallback(r, '详情里没有题目结构'); return; }
+    body.className = 'm-body';
+    body.textContent = '';
+    qs.forEach(function (q, i) {
+      var sec = el('div', 'q-sec');
+      sec.appendChild(el('div', 'q-label', '题目 ' + (i + 1)));
+      sec.appendChild(el('div', 'q-title', q.title || '（无题目文本）'));
+      if (q.hint) sec.appendChild(el('div', 'q-hint', cleanText(String(q.hint))));
+      sec.appendChild(el('div', 'q-label q-label-a', '我的答题'));
+      var atext = htmlToText((ans[q.qid] || {}).html);
+      sec.appendChild(el('div', 'q-answer' + (atext ? '' : ' q-none'), atext || '（此题未作答）'));
+      var ct = cleanText(String(cor[q.qid] || ''));
+      if (ct) {
+        sec.appendChild(el('div', 'q-label q-label-c', '老师点评'));
+        sec.appendChild(el('div', 'q-correction', ct));
+      }
+      body.appendChild(sec);
+    });
+    if (typeof d.correctionsAll === 'string' && cleanText(d.correctionsAll)) {
+      var sec2 = el('div', 'q-sec');
+      sec2.appendChild(el('div', 'q-label q-label-c', '总评'));
+      sec2.appendChild(el('div', 'q-correction', cleanText(d.correctionsAll)));
+      body.appendChild(sec2);
+    }
+    setDetailFoot(true);
+    byId('m-hint').textContent = '完整详情：题目 / 我的答题 / 老师点评 · 实时拉取';
+  }
+
+  function showRawFallback(r, note) {
+    var body = byId('m-body');
+    var item = rawMap ? rawMap[r.id] : null;
+    setDetailFoot(false);
+    if (item && cleanText(item.answer)) {
+      body.className = 'm-body';
+      body.textContent = cleanText(item.answer);
+      byId('m-hint').textContent = (note ? note + ' · ' : '') + '以下为列表接口正文（仅第 1 题，可能不完整）';
+    } else {
+      body.className = 'm-body empty-raw';
+      body.textContent = '未找到这条作业的正文。\n\n' +
+        '正文全文保存在 raw/一堂作业正文-<日期>.json（由刷新脚本 --with-raw 生成）。' +
+        '经本地服务打开且归档存在时会自动加载；' +
+        '也可以点右下角「导入正文归档…」手动选择 raw JSON 文件。';
+      byId('m-copy').style.display = 'none';
+      byId('m-hint').textContent = '';
+    }
+  }
+
+  function loadDetail(r) {
+    if (detailCache[r.id]) { renderDetailFull(r, detailCache[r.id]); return; }
+    if (detailCache[r.id] === null) { showRawFallback(r, '详情拉取失败'); return; }
+    var body = byId('m-body');
+    body.className = 'm-body m-loading';
+    body.textContent = '正在拉取完整作业（题目 + 全部作答 + 点评）…';
+    fetch('/__api/homework/' + r.id, { cache: 'no-store' })
+      .then(function (res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+      .then(function (j) {
+        if (!j || !j.ok || !j.data) throw new Error((j && j.error) || '数据为空');
+        detailCache[r.id] = j.data;
+        if (curDetail && curDetail.id === r.id) renderDetailFull(r, j.data);
+      })
+      .catch(function (e) {
+        detailCache[r.id] = null;
+        if (curDetail && curDetail.id === r.id) showRawFallback(r, '详情拉取失败（' + ((e && e.message) || e) + '）');
+      });
+  }
+
+  function openDetail(r) {
+    curDetail = r;
+    var s = r.score || 0;
+    var pill = byId('m-pill');
+    pill.className = 'pill ' + scoreClass(s);
+    pill.textContent = s === 0 ? '—' : String(s);
+    byId('m-title').textContent = r.title;
+    var bits = [];
+    bits.push(r.date ? '提交 ' + r.date : '提交日期 —');
+    bits.push((r.wordCount || 0) + ' 字');
+    if (r.excellent) bits.push('优秀');
+    if (r.commented) bits.push('已点评');
+    byId('m-meta').textContent = bits.join(' · ');
+    byId('m-official').href = 'https://yitang.top/homework/' + r.id;
+    byId('modal').hidden = false;
+    loadDetail(r);
+  }
+
+  function closeDetail() {
+    byId('modal').hidden = true;
+    curDetail = null;
+  }
+
+  function fallbackCopy(txt) {
+    var ta = document.createElement('textarea');
+    ta.value = txt;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) { /* 忽略 */ }
+    document.body.removeChild(ta);
+  }
+
+  function copyDetail() {
+    if (!curDetail) return;
+    var txt = detailCache[curDetail.id] ? buildDetailText(detailCache[curDetail.id]) : '';
+    if (!txt) {
+      var item = rawMap ? rawMap[curDetail.id] : null;
+      txt = item ? cleanText(item.answer) : '';
+    }
+    if (!txt) return;
+    var done = function () { byId('m-hint').textContent = '已复制到剪贴板'; };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(txt).then(done, function () { fallbackCopy(txt); done(); });
+    } else {
+      fallbackCopy(txt);
+      done();
+    }
+  }
+
   function tryFetch() {
     setSource('正在读取外部 JSON（' + FILE + '）…', false);
     fetch(FILE + '?t=' + Date.now(), { cache: 'no-store' })
@@ -352,6 +659,7 @@
       .then(function (j) {
         try {
           render(j);
+          loadRaw(j);
           setSource('已加载外部 JSON · 快照 ' + ((j.meta && j.meta.snapshotDate) || '—'), true);
         } catch (e) {
           setSource('外部 JSON 内容有误（' + e.message + '），仍显示内嵌快照。可修正后点「重读 JSON」', false);
@@ -378,12 +686,39 @@
       try {
         var j = JSON.parse(String(rd.result));
         render(j);
+        loadRaw(j);
         setSource('已导入本地 JSON：' + f.name + ' · 快照 ' + ((j.meta && j.meta.snapshotDate) || '—'), true);
       } catch (e) {
         setSource('导入失败：' + e.message, false);
       }
     };
     rd.onerror = function () { setSource('导入失败：文件读取错误', false); };
+    rd.readAsText(f, 'utf-8');
+    this.value = '';
+  });
+
+  // ---- 详情弹窗绑定 ----
+  byId('m-close').addEventListener('click', closeDetail);
+  byId('m-copy').addEventListener('click', copyDetail);
+  byId('m-rawimport').addEventListener('click', function () { byId('rawin').click(); });
+  byId('modal').addEventListener('click', function (e) {
+    if (e.target && e.target.getAttribute && e.target.getAttribute('data-close')) closeDetail();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !byId('modal').hidden) closeDetail();
+  });
+  byId('rawin').addEventListener('change', function () {
+    var f = this.files && this.files[0];
+    if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function () {
+      try {
+        adoptRaw(JSON.parse(String(rd.result)), f.name);
+      } catch (e) {
+        rawStatus('正文归档导入失败：' + e.message, false);
+      }
+    };
+    rd.onerror = function () { rawStatus('正文归档导入失败：文件读取错误', false); };
     rd.readAsText(f, 'utf-8');
     this.value = '';
   });
@@ -396,6 +731,18 @@
   // 供测试 / 控制台使用
   window.__yitangRender = function (obj) { render(obj); };
   window.__yitangState = function () { return rows; };
+  window.__yitangRaw = function () {
+    return { loaded: !!rawMap, file: rawFile, count: rawMap ? Object.keys(rawMap).length : 0 };
+  };
+  window.__yitangAdoptRaw = function (j, label) { adoptRaw(j, label); };
+  window.__yitangSetDetail = function (id, d) { detailCache[id] = d; };
+  window.__yitangDetail = function () { return detailCache; };
+  window.__yitangOpen = function (id) {
+    var r = null;
+    for (var i = 0; i < rows.length; i++) if (rows[i].id === id) r = rows[i];
+    if (r) openDetail(r);
+    return !!r;
+  };
 })();
 </script>
 </body>

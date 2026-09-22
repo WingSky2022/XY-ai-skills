@@ -132,6 +132,44 @@ def run_page(whyai, page):
     return data.get("items") or [], (data.get("meta") or {})
 
 
+# ---- 入库清洗（v1.2.2）：不可见字符 ----
+# 背景：接口返回的课程标题里出现过 U+2028（行分隔符 LS），VS Code 会弹「检测到异常行终止符」，
+# 且 splitlines()/grep 等按行处理工具会把标题切成两行、表格导入会错行。
+# 原则：只清理「不可见且无语义」的字符；emoji 的组成字符一律保留，避免组合 emoji（如 🙋♂️）散架。
+_LS_PS = {0x2028, 0x2029}                                        # 行/段分隔符 → 半角空格
+_ZW_DROP = {0x200B, 0x200E, 0x200F, 0x2060, 0xFEFF} | set(range(0x202A, 0x202F))
+#          ZWSP / LRM / RLM / WORD JOINER / ZWNBSP / 双向控制符 → 直接删除
+# 刻意保留：U+200C ZWNJ、U+200D ZWJ（emoji 组成）、U+FE0F 变体选择符、U+20E3 键帽、U+00A0 NBSP（有排版语义）
+
+
+def sanitize_text(s):
+    if not isinstance(s, str) or not s:
+        return s
+    return "".join(" " if ord(ch) in _LS_PS else ch
+                   for ch in s if ord(ch) not in _ZW_DROP)
+
+
+def sanitize_deep(obj):
+    """递归清洗字符串；dict/list 逐层下钻，其余类型原样返回。"""
+    if isinstance(obj, str):
+        return sanitize_text(obj)
+    if isinstance(obj, list):
+        return [sanitize_deep(x) for x in obj]
+    if isinstance(obj, dict):
+        return {k: sanitize_deep(v) for k, v in obj.items()}
+    return obj
+
+
+def find_latest_raw(data_dir):
+    """数据目录 raw/ 下最新的正文归档相对路径（文件名含日期，取排序最大者）。"""
+    rd = os.path.join(data_dir, "raw")
+    if not os.path.isdir(rd):
+        return None
+    cands = sorted(f for f in os.listdir(rd)
+                   if f.startswith("一堂作业正文-") and f.endswith(".json"))
+    return "raw/" + cands[-1] if cands else None
+
+
 def build_rows(items):
     rows = {}
     for it in items:
@@ -303,6 +341,8 @@ def main():
         items.extend(more)
         print("  page %d/%d ok (+%d)" % (p, page_count, len(more)))
 
+    items = sanitize_deep(items)  # 入库清洗：去不可见字符（规则见 sanitize_text 上方注释）
+
     rows = build_rows(items)
     dist, score_sum, graded = summarize(rows)
     today = datetime.date.today().strftime("%Y-%m-%d")
@@ -344,6 +384,12 @@ def main():
             for i, a, b, t in changed[:10]:
                 print("   ~ %s -> %s  %s" % (a, b, t[:40]))
 
+    # 正文归档指针：写进清单 meta.rawFile，工作台详情视图按它加载 raw JSON、按 id 取正文全文
+    if args.with_raw:
+        raw_ptr = "raw/一堂作业正文-%s.json" % today
+    else:
+        raw_ptr = find_latest_raw(data_dir) or ((old or {}).get("meta") or {}).get("rawFile")
+
     if dry:
         print("-" * 46)
         print("[待确认] 全量下载与写入请求（本次仅只读检查，未写任何文件）")
@@ -353,6 +399,7 @@ def main():
         print("  将写入：")
         print("    %s（%d 条，account 保留人工口径）" % (json_path, len(rows)))
         print("    workbench/%s（技能内工作台前端，空 seed）" % PAGE_NAME)
+        print("    meta.rawFile 正文指针：%s" % (raw_ptr or "（无，未发现 raw 归档）"))
         if args.with_raw:
             print("    raw/一堂作业正文-%s.json（正文全文）" % today)
         print("  确认后执行：python3 %s --confirm%s" % (
@@ -379,6 +426,8 @@ def main():
         "account": account or {"score": None, "scoreExtra": None, "officialExcellent": None, "officialPerfect": None},
         "rows": rows,
     }
+    if raw_ptr:
+        data["meta"]["rawFile"] = raw_ptr
 
     os.makedirs(data_dir, exist_ok=True)
     atomic_write(json_path, json.dumps(data, ensure_ascii=False, indent=2) + "\n", backup=not args.no_backup)
@@ -401,11 +450,14 @@ def main():
             "meta": {
                 "snapshotDate": today,
                 "fetchedAt": now,
-                "title": "一堂作业正文全文（原始 API 返回归档）",
+                "title": "一堂作业正文全文（API 返回归档，已清理不可见字符）",
                 "source": "whyai yitang homework list（只读，%d 页 /api/answer/list）" % page_count,
                 "itemCount": len(raw_items),
-                "note": "字段为接口原样返回（lessonName/score/isExcellentWork/answer/textCount/"
-                        "commented/completed/rewardCode/editTime）。派生结构化清单见上级目录 %s.json。" % DATA_NAME,
+                "note": "字段为接口返回值（lessonName/score/isExcellentWork/answer/textCount/"
+                        "commented/completed/rewardCode/editTime）。入库清洗仅针对不可见字符："
+                        "U+2028/2029（行/段分隔符）→半角空格；零宽与双向控制残留（ZWSP/WJ/ZWNBSP/"
+                        "LRM/RLM/BiDi）移除；emoji 组成字符（ZWJ/ZWNJ/变体选择符/键帽）与 NBSP 原样保留。"
+                        "派生结构化清单见上级目录 %s.json。" % DATA_NAME,
             },
             "items": raw_items,
         }
