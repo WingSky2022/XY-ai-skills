@@ -204,8 +204,6 @@
       if (typeof r.title !== 'string' || typeof r.score !== 'number')
         throw new Error('第 ' + (i + 1) + ' 行缺少 title / score');
     }
-    if (!d.account || typeof d.account.score !== 'number')
-      throw new Error('缺少 account.score');
     return true;
   }
 
@@ -237,7 +235,8 @@
     var graded = rows.length - ungraded;
     var avg = graded ? (sum / graded) : 0;
 
-    byId('v-account').textContent = acc.score;
+    var hasAcc = typeof acc.score === 'number';
+    byId('v-account').textContent = hasAcc ? acc.score : '—';
     byId('v-count').textContent = rows.length;
     byId('v-sum').textContent = sum;
     byId('v-full').textContent = full;
@@ -246,13 +245,13 @@
 
     byId('n-ungraded').textContent = ungraded;
     byId('n-sum').textContent = sum;
-    byId('n-account').textContent = acc.score;
-    byId('n-extra').textContent = acc.scoreExtra;
-    byId('n-operfect').textContent = acc.officialPerfect;
-    byId('n-oexc').textContent = acc.officialExcellent;
+    byId('n-account').textContent = hasAcc ? acc.score : '待填写';
+    byId('n-extra').textContent = (typeof acc.scoreExtra === 'number') ? acc.scoreExtra : '待填写';
+    byId('n-operfect').textContent = (typeof acc.officialPerfect === 'number') ? acc.officialPerfect : '待填写';
+    byId('n-oexc').textContent = (typeof acc.officialExcellent === 'number') ? acc.officialExcellent : '待填写';
     byId('n-exc').textContent = exc;
     byId('n-date').textContent = (d.meta && d.meta.snapshotDate) || '—';
-    byId('sub').textContent = '快照 ' + ((d.meta && d.meta.snapshotDate) || '—') +
+    byId('sub').textContent = (hasAcc ? '' : '账户口径待填写（account 四项）· ') + '快照 ' + ((d.meta && d.meta.snapshotDate) || '—') +
       ' · 共 ' + rows.length + ' 条作业';
 
     var distEl = byId('dist');

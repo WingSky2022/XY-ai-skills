@@ -15,19 +15,30 @@
 
 **对 Agent 说**（已装入技能目录时）：「更新我的作业评分」「拉取作业学分」「查我作业得了几分」。
 
-**直接命令行**：
+**直接命令行**（两段式：先检查，确认后才写入）：
 
 ```bash
 cd 你想存放数据的目录
-python3 <技能目录>/scripts/refresh_homework.py --dry-run   # 先看环境核对 + 对比报告，不写文件
-python3 <技能目录>/scripts/refresh_homework.py             # 真实写入（自动 .bak）
-python3 <技能目录>/scripts/refresh_homework.py --with-raw  # 顺带归档作业正文全文
+python3 <技能目录>/scripts/refresh_homework.py                # 第一段：检查 + 出报告，不写任何文件
+python3 <技能目录>/scripts/refresh_homework.py --confirm --serve   # 第二段：确认后写入并拉起工作台
+python3 <技能目录>/scripts/refresh_homework.py --confirm --with-raw  # 顺带归档作业正文全文
 ```
+
+写入必须显式加 `--confirm`（= 你已确认全量下载）；不加时脚本只做只读检查与报告，绝不落盘。
+
+工作台随时可单独打开：
+
+```bash
+python3 <技能目录>/scripts/start_workbench.py --dir <数据目录>        # 前台服务 + 自动开浏览器
+python3 <技能目录>/scripts/start_workbench.py --dir <数据目录> --stop # 停止后台服务
+```
+
+数据目录里也会生成双击入口：macOS `start-workbench.command`、Windows `start-workbench.bat`。
 
 ## 约定（使用前请读）
 
-- 产物：`一堂作业评分清单.json`（真相源）+ `一堂作业评分清单.html`（工作台，双击即看内嵌快照）+ 可选 `raw/` 正文归档；覆盖前自动生成 `.bak`。
-- **改数据后如何生效**：双击打开时浏览器会拦读取旁边 JSON（`file://` 限制）——用 HTML 里的「导入 JSON」按钮手动加载；或 `python3 -m http.server` 起本地服务后打开，会自动读取。
-- **手填规则**：只填 `rows`（每条 id/title/score/excellent/commented/wordCount/date）与 `account` 四项；所有统计（合计/平均/分布）由页面实时计算，不要写进 JSON。
+- 产物：`一堂作业评分清单.json`（真相源）+ `一堂作业评分清单.html`（工作台）+ 可选 `raw/` 正文归档 + 双击启动入口；覆盖前自动生成 `.bak`。
+- **后台服务 = 前端的数据通道**：浏览器在 `file://` 下会拦读取旁边 JSON。用启动器（或 `--serve`）起本地服务打开时，页面**自动读取 JSON**（状态条显示「已加载外部 JSON」），数据源唯一；双击打开则只看内嵌快照，需要时用「导入 JSON」按钮。
+- **手填规则**：`account` 四项（账户学分 / 额外学分 / 官方优秀 / 官方满分）是官方账户口径，**永远人工填写**，脚本保留不覆盖；首次运行页面会显示「账户口径待填写」。`rows`（作业明细）以官方拉取为权威，每次全量覆盖。
 - **口径**：单次作业评分 3/4/5/6（6 = 满分）；**逐条合计 ≠ 账户总学分**（学分含额外学分与非作业来源）；官方「优秀作业数」与列表标记数可能不一致，以官方页面为准。
-- **安全边界**：只调只读接口，禁止 chat / 上传 / 任何服务端写入；版本与登录态核对不过时脚本拒绝执行（确认无碍后可 `--skip-env-check`）。
+- **安全边界**：只调只读接口，禁止 chat / 上传 / 任何服务端写入；版本与登录态核对不过时脚本拒绝执行（确认无碍后可 `--skip-env-check`）；本地服务只监听 127.0.0.1。

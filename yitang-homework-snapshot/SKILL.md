@@ -7,7 +7,7 @@ triggers:
   - 刷新作业清单
   - 作业评分报告
   - homework snapshot
-version: 1.0.0
+version: 1.1.0
 author: WingSky
 ---
 
@@ -35,32 +35,45 @@ author: WingSky
 - 已知且可接受的元数据行为：每条 `yitang` 命令会向 Gateway 上报一次收据（接口名、字节数、成败），**不含参数值与返回正文**；每个命令执行前 CLI 会做一次版本策略检查。
 - 所有成绩数据只落本地，不回传。
 
-## 使用
+## 使用（两段式：先检查，确认后才写入）
 
 ```bash
 cd 你想存放数据的目录
 
-# 第一步永远先 dry-run：环境核对 + 只拉取出对比报告，不写任何文件
-python3 <技能目录>/scripts/refresh_homework.py --dry-run
-
-# 确认报告（条数/合计/满分变化、新增/消失/评分变化明细）后，真实写入（默认自动生成 .bak）
+# 第一段：环境核对 + 只读拉取 + 出报告，**不写任何文件**
 python3 <技能目录>/scripts/refresh_homework.py
 
-# 额外归档原始 API 返回（含作业正文全文）到 raw/一堂作业正文-<日期>.json
-python3 <技能目录>/scripts/refresh_homework.py --with-raw
+# —— 到此为止只读。把报告（条数 / 评分分布 / 新增消失 / 评分变化）给用户看，取得明确确认 ——
+
+# 第二段：用户确认后才写入，并直接拉起后台服务 + 打开工作台
+python3 <技能目录>/scripts/refresh_homework.py --confirm --serve
+
+# 可选：顺带归档作业正文全文到 raw/
+python3 <技能目录>/scripts/refresh_homework.py --confirm --with-raw
 ```
 
-参数：`--target DIR`（输出目录，默认当前目录）、`--pages N`（限定页数）、`--no-backup`、`--skip-env-check`、`--with-raw`。
+**确认门禁（硬规则）**：`--confirm` 表示「用户已确认全量写入」。**未经用户明确确认，不得自行加 `--confirm`**；无 `--confirm` 时脚本只做只读检查与报告。
 
-**脚本自动完成**：whyai 发现（`WHYAI_BIN` → `PATH` → macOS `~/.local/bin` → Windows `%LOCALAPPDATA%\WhyAI\bin`）→ 环境核对 → 分页拉取去重 → 与旧数据对比 → 原子写 JSON（旧文件存 `.bak`）→ 工作台生成：目标目录**没有** HTML 时从自带模板实例化；**已有**则仅替换其 `<script id="seed">` 块（其余人工修改保留，找不到唯一 seed 块则不动 HTML 并告警）。
+参数：`--confirm`（授权写入）、`--serve`（写入后拉起工作台）、`--target DIR`（输出目录，默认当前目录）、`--pages N`、`--with-raw`、`--no-backup`、`--skip-env-check`。
 
-## 工作台怎么用（数据更新后看新数据）
+**脚本自动完成**：whyai 发现（`WHYAI_BIN` → `PATH` → macOS `~/.local/bin` → Windows `%LOCALAPPDATA%\WhyAI\bin`）→ 环境核对 → 分页拉取去重 → 与旧数据对比 → （确认后）原子写 JSON（旧文件存 `.bak`）→ 工作台生成：目标目录**没有** HTML 时从自带模板实例化；**已有**则仅替换其 `<script id="seed">` 块（其余人工修改保留）→ 生成双击启动入口 → 可选拉起后台服务。
+
+## 工作台怎么用
+
+**推荐：让技能拉起后台服务**（`--serve`）：自动选空闲端口启动本地静态服务并打开浏览器，此时页面**真正读取同名 JSON**，数据源与 JSON 始终一致。停止服务：`python3 <技能目录>/scripts/start_workbench.py --dir <数据目录> --stop`。
+
+**随时手动打开**：
+
+```bash
+python3 <技能目录>/scripts/start_workbench.py --dir <数据目录>   # 前台服务 + 自动开浏览器，Ctrl+C 停止
+```
+数据目录里也会生成双击入口：macOS `start-workbench.command`、Windows `start-workbench.bat`。
 
 | 打开方式 | 效果 |
 |---|---|
-| 双击 HTML（`file://`） | 立即可看**内嵌快照**；但浏览器会拦截读取旁边 JSON 的请求（CORS），改了 JSON 不会自动生效 |
-| 本地 HTTP 服务 | 自动读取旁边 JSON。例：`python3 -m http.server`，浏览器打开后状态条显示「已加载外部 JSON」 |
-| HTML 里「导入 JSON」按钮 | 任何环境可用：手动选择 JSON 文件，读完刷新整页 |
+| 后台/前台本地服务 | **自动读取旁边 JSON**（状态条显示「已加载外部 JSON」）——数据源唯一 |
+| 双击 HTML（`file://`） | 只显示**内嵌快照**（浏览器拦截读取旁边 JSON）；改了 JSON 不生效 |
+| HTML 里「导入 JSON」按钮 | 任何环境可用：手动选 JSON 文件，读完刷新整页 |
 
 ## 数据契约（手工填写也支持）
 
@@ -77,7 +90,9 @@ python3 <技能目录>/scripts/refresh_homework.py --with-raw
 两条铁律：
 
 1. `count / sum / avg / 评分分布` 全部由 HTML 从 `rows` **实时计算**——不要写进 JSON，手填时不算数。
-2. `account` 是**官方账户口径**（含额外学分与非作业来源），**永远不从作业列表推算**；缺失时脚本告警并留空。
+2. `account` 是**官方账户口径**（含额外学分与非作业来源），**永远不从作业列表推算**。首次运行时脚本写入空值并告警，页面显示「—」与「账户口径待填写」提示，等你手工补这四项。
+
+> 刷新策略：`rows` 以官方拉取为权威，**每次全量写入整体覆盖**；`account` 保留人工值。若要保留手工补录的作业条目，不要加进 `rows`（会被覆盖），改为放在单独文件里自行维护。
 
 ## 口径方法论（读数据前必读）
 
@@ -88,5 +103,6 @@ python3 <技能目录>/scripts/refresh_homework.py --with-raw
 
 ## 边界
 
-- 只写目标目录下 `一堂作业评分清单.json` / `.html`（及 `.bak`）与 `raw/` 归档；不碰其他文件；删除/重命名产物由用户决定。
+- 只写目标目录下 `一堂作业评分清单.json` / `.html`（及 `.bak`）、`raw/` 归档、两个启动入口，以及服务运行时产生的 `.workbench-server.pid` / `.workbench-server.log` 点文件；不碰其他文件；删除/重命名产物由用户决定。
+- 后台服务只监听 `127.0.0.1`，不对外网暴露；不需要时用 `--stop` 关闭。
 - 如需 whyai CLI 更完整的命令路由、Partner 体系与操作细节说明，可配合同仓的 `whyai-cli` 公开技能（可选，非依赖）。

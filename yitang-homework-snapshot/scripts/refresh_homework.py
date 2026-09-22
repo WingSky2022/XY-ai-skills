@@ -11,11 +11,11 @@
   5. 目标目录无 HTML 时从 assets/workbench.template.html 实例化工作台；已有则仅替换 seed 块
 
 只读拉取、零出境：不调用 whyai chat / 上传 / 任何写操作。
-用法（在你想存放数据的目录里运行）：
-  python3 refresh_homework.py --dry-run          # 环境核对 + 只拉取出报告，不写任何文件
-  python3 refresh_homework.py                    # 拉取并生成/更新 JSON + 工作台
-  python3 refresh_homework.py --with-raw         # 额外归档原始返回（含作业正文全文）到 raw/
-  python3 refresh_homework.py --target 某目录    # 指定输出目录（默认当前目录）
+两段式流程（写入前必须过确认门禁）：
+  python3 refresh_homework.py                    # 第一段：环境核对 + 只读拉取 + 出报告，**不写文件**
+  python3 refresh_homework.py --confirm          # 第二段：用户确认后执行全量写入
+  python3 refresh_homework.py --confirm --serve  # 写入后直接拉起后台服务并打开工作台
+  python3 refresh_homework.py --confirm --with-raw   # 顺带归档作业正文全文到 raw/
 """
 import argparse
 import datetime
@@ -23,14 +23,23 @@ import json
 import os
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
+import time
+import urllib.parse
 
 NAME = "一堂作业评分清单"
 SKILL_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE = os.path.join(SKILL_DIR, "..", "assets", "workbench.template.html")
 DEFAULT_TARGET = os.getcwd()
+
+sys.path.insert(0, SKILL_DIR)
+try:
+    import start_workbench as wb
+except Exception:
+    wb = None
 
 # 环境核对基线：与本技能核对时的 whyai CLI 版本。版本变化可能意味着行为边界变化，
 # 不一致时脚本默认拒绝执行；人工确认版本变化无碍后可加 --skip-env-check。
@@ -119,6 +128,71 @@ def summarize(rows):
     return dist, s, graded
 
 
+def serve_in_background(target):
+    """拉起后台静态服务（前端由此能读取同名 JSON），并打开浏览器。
+
+    父进程自选端口并把子进程输出写入日志文件（不接管道）：否则父进程退出后管道断裂，
+    子进程后续写日志会触发 BrokenPipe 而崩溃。
+    """
+    target = os.path.abspath(target)
+    starter = os.path.join(SKILL_DIR, "start_workbench.py")
+    if wb is None or not os.path.exists(starter):
+        print("[WARN] 启动器不可用（%s），已跳过拉起服务" % starter)
+        return
+    page = wb.pick_page(target)
+    if not page:
+        print("[WARN] 目标目录无 HTML 工作台，跳过拉起服务")
+        return
+
+    port = wb.free_port()
+    log_path = os.path.join(target, ".workbench-server.log")
+    kwargs = {}
+    if os.name == "nt":
+        kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    else:
+        kwargs["start_new_session"] = True
+    with open(log_path, "a", encoding="utf-8") as log:
+        proc = subprocess.Popen(
+            [sys.executable, starter, "--dir", target, "--port", str(port),
+             "--no-browser", "--quiet"],
+            stdout=log, stderr=log, stdin=subprocess.DEVNULL, **kwargs)
+
+    ok = False
+    for _ in range(40):
+        try:
+            with socket.create_connection(("127.0.0.1", port), 0.2):
+                ok = True
+                break
+        except OSError:
+            time.sleep(0.1)
+    url = "http://127.0.0.1:%d/%s" % (port, urllib.parse.quote(page))
+    if ok:
+        import webbrowser
+        webbrowser.open(url)
+        print("后台服务已启动（PID %d）：%s" % (proc.pid, url))
+        print("停止服务：python3 %s --dir %s --stop" % (starter, target))
+        print("服务日志：%s" % log_path)
+    else:
+        print("[WARN] 后台服务未就绪，可手动运行：python3 %s --dir %s" % (starter, target))
+        print("       日志见：%s" % log_path)
+
+
+def write_launchers(target):
+    """在数据目录生成双击启动入口（就近可用，不必记路径）。"""
+    starter = os.path.join(SKILL_DIR, "start_workbench.py")
+    cmd = os.path.join(target, "start-workbench.command")
+    bat = os.path.join(target, "start-workbench.bat")
+    try:
+        with open(cmd, "w", encoding="utf-8") as fh:
+            fh.write('#!/bin/bash\ncd "$(dirname "$0")"\nexec python3 "%s" --dir "$(pwd)"\n' % starter)
+        os.chmod(cmd, 0o755)
+        with open(bat, "w", encoding="ascii", errors="ignore") as fh:
+            fh.write('@echo off\r\npython "%s" --dir "%%~dp0"\r\npause\r\n' % starter)
+        print("已生成启动入口：start-workbench.command（macOS 双击/右键打开）、start-workbench.bat（Windows）")
+    except Exception as e:
+        print("[WARN] 生成启动入口失败：%s" % e)
+
+
 def atomic_write(path, text, backup=True):
     if backup and os.path.exists(path):
         bak = path + ".bak"
@@ -138,7 +212,10 @@ def atomic_write(path, text, backup=True):
 
 def main():
     ap = argparse.ArgumentParser(description="作业评分快照刷新（whyai CLI 只读拉取 → JSON + 工作台）")
-    ap.add_argument("--dry-run", action="store_true", help="环境核对 + 只拉取出报告，不写文件")
+    ap.add_argument("--confirm", action="store_true",
+                    help="用户已确认：执行全量写入。未加此参数时等同 dry-run（只报告，不写文件）")
+    ap.add_argument("--dry-run", action="store_true", help="显式只报告不写文件（默认行为，冗余保留）")
+    ap.add_argument("--serve", action="store_true", help="写入完成后拉起后台服务并打开工作台")
     ap.add_argument("--pages", type=int, default=0, help="限定页数（默认按 meta.pageCount 自动）")
     ap.add_argument("--target", default=DEFAULT_TARGET, help="输出目录（默认当前目录）")
     ap.add_argument("--no-backup", action="store_true", help="覆盖前不生成 .bak")
@@ -147,6 +224,7 @@ def main():
     ap.add_argument("--with-raw", action="store_true",
                     help="同时归档原始 API 返回（含作业正文全文）到 raw/一堂作业正文-<日期>.json")
     args = ap.parse_args()
+    dry = args.dry_run or not args.confirm
 
     whyai = find_whyai()
     if not whyai:
@@ -205,8 +283,19 @@ def main():
             for i, a, b, t in changed[:10]:
                 print("   ~ %s -> %s  %s" % (a, b, t[:40]))
 
-    if args.dry_run:
-        print("[dry-run] 未写任何文件。去掉 --dry-run 执行真实写入。")
+    if dry:
+        print("-" * 46)
+        print("[待确认] 全量下载与写入请求（本次仅只读检查，未写任何文件）")
+        print("  目标目录：%s" % os.path.abspath(args.target))
+        print("  已读取：%d 页 / %d 条作业" % (page_count, len(rows)))
+        print("  将写入：")
+        print("    一堂作业评分清单.json（%d 条，account 保留人工口径）" % len(rows))
+        print("    一堂作业评分清单.html（无则从模板实例化，有则只同步 seed）")
+        if args.with_raw:
+            print("    raw/一堂作业正文-%s.json（正文全文）" % today)
+        print("  确认后执行：python3 %s --confirm%s" % (
+            os.path.basename(__file__), " --serve" if args.serve else ""))
+        print("  （数据未落盘；此步已完成只读拉取，确认只决定是否写入本地）")
         return 0
 
     account = (old or {}).get("account") or {}
@@ -286,6 +375,11 @@ def main():
                      backup=not args.no_backup)
         print("写入: %s（正文全文 %d 条，%d 字）"
               % (raw_path, len(raw_items), sum(i.get("textCount") or 0 for i in raw_items)))
+
+    write_launchers(args.target)
+
+    if args.serve:
+        serve_in_background(args.target)
 
     print("完成。快照 %s：%d 条作业。" % (today, len(rows)))
     return 0
