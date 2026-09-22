@@ -7,7 +7,7 @@ triggers:
   - 刷新作业清单
   - 作业评分报告
   - homework snapshot
-version: 1.2.0
+version: 1.2.1
 author: WingSky
 ---
 
@@ -17,11 +17,11 @@ author: WingSky
 
 | 位置 | 内容 |
 |---|---|
-| 数据目录（`config.json` 的 `data_dir`，默认 `~/Documents/一堂作业工作台`） | **只有数据**：`一堂作业评分清单.json`（`meta` + `account` + `rows[]`），可选 `raw/` 正文归档 |
+| 数据目录（默认 `~/Documents/一堂作业工作台`） | **只有数据**：`一堂作业评分清单.json`（`meta` + `account` + `rows[]`），可选 `raw/` 正文归档 |
 | 技能目录/`workbench/` | **工作台前端**（评分分布、关键词搜索、3/4/5/6 分与未评分筛选、小屏卡片化）+ 双击启动入口 |
 | 技能目录/`scripts/`、`assets/` | 拉取脚本、本地服务启动器、工作台模板 |
 
-数据目录一次配置即可（`config.json` 的 `data_dir`；相对路径按技能目录解析，便于随仓库跨机同步），也可用 `--target` 或环境变量 `YITANG_HOMEWORK_DATA_DIR` 覆盖。
+数据目录默认 `~/Documents/一堂作业工作台`；可用 `--target DIR` 或环境变量 `YITANG_HOMEWORK_DATA_DIR` 指定，也可在技能目录自建 `config.json`（`{"data_dir": "路径"}`，相对路径按技能目录解析）。
 
 本技能**自包含、不依赖其他技能**：只调用本地已安装的 `whyai` CLI（whyai-cli 公开技能是可选补充，非必需）。
 
