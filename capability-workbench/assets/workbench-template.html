@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>双三角 × Feature 能力工作台</title>
+<style>
+:root{
+  --cream:#FAF7F1; --oat:#F2EDE4; --sand:#EAE2D5; --line:#E5DCCD; --line-soft:#EFE8DC;
+  --ink:#33291F; --ink-soft:#6E6355; --ink-mute:#9C9080;
+  --terra:#B5622F; --terra-d:#8F4A20; --terra-l:#D4884A;
+  --olive:#77805C; --olive-d:#5C6446;
+  --gold:#D4A24A; --viz-track:#EADFCB;
+  --r:16px; --r-lg:22px;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",Roboto,sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Songti SC","Source Han Serif SC",STSong,serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--cream);color:var(--ink);font-family:var(--sans);line-height:1.7;font-size:15px}
+.wrap{max-width:1120px;margin:0 auto;padding:34px 20px 70px}
+.hero{background:var(--ink);color:#F6EFE4;border-radius:var(--r-lg);padding:44px 36px 38px;box-shadow:0 10px 28px rgba(70,58,46,.13)}
+.hero .eyebrow{font-size:11px;letter-spacing:.4em;color:#C9B99B;text-transform:uppercase}
+.hero h1{font-family:var(--serif);font-size:40px;font-weight:600;margin:10px 0 6px;letter-spacing:.01em}
+.hero .cap{color:#CFC3AC;font-size:14.5px}
+.badges{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+.badge{border:1px solid rgba(246,239,228,.28);border-radius:999px;padding:6px 16px;font-size:13px;color:#F6EFE4}
+.badge b{font-weight:600}
+.badge.stage{background:var(--terra-l);border-color:var(--terra-l);color:#fff;font-weight:600}
+.bento{display:grid;grid-template-columns:repeat(12,1fr);gap:16px;margin-top:16px}
+.tile{background:#fff;border:1px solid var(--line-soft);border-radius:var(--r);padding:24px 26px;box-shadow:0 1px 16px rgba(70,58,46,.07)}
+.c12{grid-column:span 12}.c7{grid-column:span 7}.c5{grid-column:span 5}
+.t-head{margin-bottom:14px}
+.eyebrow{font-size:10.5px;letter-spacing:.32em;color:var(--ink-mute);text-transform:uppercase}
+.t-head h2{font-family:var(--serif);font-size:22px;font-weight:600;margin-top:4px}
+.cap{color:var(--ink-soft);font-size:13px;margin-top:3px}
+.cap b{color:var(--terra);font-weight:600}
+.tri-zone{display:grid;grid-template-columns:140px 1fr 140px;gap:12px;align-items:center}
+.soul{background:var(--oat);border:1px solid var(--line);border-radius:12px;padding:13px 12px;font-size:12.5px;color:var(--ink-soft);height:fit-content}
+.soul .tag{font-size:10px;letter-spacing:.3em;color:var(--ink-mute);display:block;margin-bottom:7px}
+.soul.q-left{border-left:3px solid var(--terra)}
+.soul.q-right{border-left:3px solid var(--olive)}
+svg.tri{width:100%;height:auto;display:block}
+.corner{cursor:pointer}
+.corner:hover{opacity:.85}
+.corner.active .cname{fill:var(--terra-d)}
+.corner.right.active .cname{fill:var(--olive-d)}
+.detail{margin-top:16px;background:var(--oat);border:1px solid var(--line);border-radius:12px;padding:18px 20px;min-height:110px}
+.detail h3{font-family:var(--serif);font-size:17px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.detail .one{color:var(--ink-soft);font-size:13.5px;margin:6px 0 10px}
+.detail ul{list-style:none}
+.detail li{font-size:13.5px;padding:5px 0 5px 18px;position:relative;border-bottom:1px dashed var(--line)}
+.detail li:last-child{border-bottom:none}
+.detail li::before{content:"";position:absolute;left:2px;top:12px;width:7px;height:7px;border-radius:2px;background:var(--terra)}
+.detail.right-color li::before{background:var(--olive)}
+.chip{display:inline-block;background:#fff;border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:12px;margin:2px 2px;color:var(--ink-soft)}
+.grid-wrap{display:grid;grid-template-columns:1fr 210px;gap:14px}
+.ptable{width:100%;border-collapse:separate;border-spacing:4px;font-size:11.5px}
+.ptable th{font-weight:600;color:var(--ink-mute);padding:4px;font-size:11.5px;letter-spacing:.05em}
+.ptable .lv{background:var(--ink);color:#F6EFE4;border-radius:10px;padding:8px 6px;text-align:center;vertical-align:middle}
+.ptable .lv b{font-family:var(--serif);display:block;font-size:14px}
+.ptable .lv span{font-size:10px;color:#C9B99B;display:block;line-height:1.35}
+.ptable td{background:var(--oat);border:1px solid var(--line-soft);border-radius:10px;padding:7px 8px;vertical-align:top;color:var(--ink-soft);cursor:pointer;transition:.15s}
+.ptable td:hover{border-color:var(--terra-l);background:#fff}
+.ptable td.has-ev{border-top:3px solid var(--terra);background:#FBF4EC}
+.ptable td .f{display:block;line-height:1.5}
+.scenebar{background:var(--sand);border:1px solid var(--line);border-radius:12px;padding:16px 14px;font-size:12.5px;color:var(--ink-soft)}
+.scenebar b{color:var(--olive-d);display:block;margin-bottom:10px;font-size:13px;font-family:var(--serif)}
+.scenebar .chip{background:#fff;margin:5px 3px;padding:4px 12px}
+.timeline{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.tl-card{background:var(--oat);border:1px solid var(--line-soft);border-top:3px solid var(--terra);border-radius:12px;padding:14px}
+.tl-card:nth-child(even){border-top-color:var(--olive)}
+.tl-card h4{font-family:var(--serif);font-size:14.5px}
+.tl-card .span{color:var(--terra);font-size:12px;font-weight:600}
+.tl-card:nth-child(even) .span{color:var(--olive-d)}
+.tl-card p{font-size:12.5px;color:var(--ink-soft);margin-top:6px}
+.lib-meter{display:flex;justify-content:center;margin:14px 0 8px}
+.lib-meter .st{flex:1;max-width:110px;text-align:center;font-size:12px;color:var(--ink-mute);position:relative;padding-top:16px}
+.lib-meter .st::before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);width:12px;height:12px;border-radius:50%;background:var(--viz-track)}
+.lib-meter .st::after{content:"";position:absolute;top:5px;left:calc(50% + 8px);width:calc(100% - 16px);height:2px;background:var(--viz-track)}
+.lib-meter .st:last-child::after{display:none}
+.lib-meter .st.hit{color:var(--ink);font-weight:600}
+.lib-meter .st.hit::before{background:var(--terra)}
+.lib-items{display:flex;flex-wrap:wrap;gap:8px}
+.lib-items .it{background:#fff;border:1px solid var(--line);border-radius:999px;padding:5px 14px;font-size:12.5px}
+.lib-items .it small{color:var(--ink-mute)}
+.acards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.a-card{background:var(--oat);border:1px solid var(--line-soft);border-radius:12px;padding:14px}
+.a-card h4{font-family:var(--serif);font-size:14.5px}
+.a-card .role{font-size:12px;color:var(--ink-mute);margin:2px 0 8px}
+.a-card .hl{font-size:12px;color:var(--terra);margin-top:8px}
+.lvl-row{display:flex;flex-wrap:wrap;gap:4px}
+.lvl-row span{font-size:10.5px;border-radius:5px;padding:1px 6px;background:#fff;border:1px solid var(--line-soft);color:var(--ink-soft)}
+.lvl-row span.full{background:var(--terra);border-color:var(--terra);color:#fff;font-weight:600}
+.findings{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px}
+.findings .f-item{background:var(--oat);border:1px solid var(--line-soft);border-left:3px solid var(--gold);border-radius:10px;padding:10px 14px;font-size:13px}
+footer{text-align:center;color:var(--ink-mute);font-size:12px;margin-top:34px;padding-top:18px;border-top:1px solid var(--line)}
+@media(max-width:820px){
+  .hero{padding:30px 22px}
+  .hero h1{font-size:28px}
+  .c7,.c5{grid-column:span 12}
+  .tri-zone{grid-template-columns:1fr}
+  .soul{max-width:420px;margin:0 auto}
+  .grid-wrap{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="hero">
+  <div class="eyebrow">Capability Workbench</div>
+  <h1 id="h1Title"></h1>
+  <div class="cap" id="heroCap"></div>
+  <div class="badges">
+    <span class="badge stage" id="stageBadge"></span>
+    <span class="badge" id="tpBadge"></span>
+    <span class="badge">数据截至 <b id="genDate"></b></span>
+  </div>
+</div>
+
+<div class="bento">
+<div class="tile c12">
+  <div class="t-head"><span class="eyebrow">Dual Triangle</span><h2>双三角模型</h2><div class="cap">架构取自一堂「双三角模型」原图 · <b>点击六个角</b>查看证据</div></div>
+  <div class="tri-zone">
+    <div class="soul q-left"><span class="tag">灵魂拷问</span><span id="soulL"></span></div>
+    <svg class="tri" viewBox="0 0 680 630" role="img" aria-label="双三角模型图">
+      <polygon points="340,130 80,470 340,470" fill="#EBB28B" opacity="0.85"/>
+      <polygon points="340,130 600,470 340,470" fill="#A9B48B" opacity="0.85"/>
+      <polygon points="340,130 80,470 600,470" fill="none" stroke="#A08869" stroke-width="1" stroke-dasharray="5 4"/>
+      <line x1="340" y1="130" x2="340" y2="470" stroke="#FAF7F1" stroke-width="2.5"/>
+      <text x="340" y="252" text-anchor="middle" font-family="var(--serif)" font-size="24" font-weight="600" fill="#33291F">人类三角 <tspan fill="#B5622F">×</tspan> AI三角</text>
+      <text x="262" y="286" text-anchor="middle" font-size="12.5" fill="#8F4A20">持续让自己变强</text>
+      <text x="420" y="286" text-anchor="middle" font-size="12.5" fill="#5C6446">持续使用 AI 更强</text>
+      <path d="M255,225 Q340,185 425,222" fill="none" stroke="#B5622F" stroke-width="2.2" marker-end="url(#ar)"/>
+      <text x="340" y="180" text-anchor="middle" font-size="12" fill="#6E6355" id="flyTop"></text>
+      <path d="M425,362 Q340,400 255,364" fill="none" stroke="#B5622F" stroke-width="2.2" marker-end="url(#ar)"/>
+      <text x="340" y="405" text-anchor="middle" font-size="12" fill="#6E6355" id="flyBot"></text>
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M2 1L8 5L2 9" fill="none" stroke="#B5622F" stroke-width="1.6" stroke-linecap="round"/>
+        </marker>
+      </defs>
+      <g id="g-creativity" class="corner"></g>
+      <g id="g-scene" class="corner right"></g>
+      <g id="g-aesthetic" class="corner"></g>
+      <g id="g-system" class="corner"></g>
+      <g id="g-fundamentals" class="corner right"></g>
+      <g id="g-data" class="corner right"></g>
+    </svg>
+    <div class="soul q-right"><span class="tag">灵魂拷问</span><span id="soulR"></span></div>
+  </div>
+  <div class="detail" id="cornerDetail"></div>
+</div>
+
+<div class="tile c12">
+  <div class="t-head"><span class="eyebrow">Feature Periodic Table v0.8</span><h2>Feature 周期律</h2><div class="cap">纵轴 L1→L5 自下而上螺旋上升 · <b>橙色顶边</b> = 已有实证归位 · 点击格子看证据</div></div>
+  <div class="grid-wrap">
+    <div style="overflow-x:auto"><table class="ptable" id="ptable"></table></div>
+    <div class="scenebar"><b id="sbTitle"></b><div id="sbItems"></div></div>
+  </div>
+  <div class="detail" id="cellDetail"></div>
+</div>
+
+<div class="tile c7">
+  <div class="t-head"><span class="eyebrow">Iteration Chains</span><h2>迭代证据链</h2><div class="cap">「一假设一版、可归因」· 全部来自真实 commit 历史</div></div>
+  <div class="timeline" id="timeline"></div>
+</div>
+
+<div class="tile c5">
+  <div class="t-head"><span class="eyebrow">Feature Library</span><h2>Feature Library</h2><div class="cap" id="libNote"></div></div>
+  <div class="lib-meter" id="libMeter"></div>
+  <div class="lib-items" id="libItems"></div>
+</div>
+
+<div class="tile c12">
+  <div class="t-head"><span class="eyebrow">Asset Canvas</span><h2>七资产画布</h2><div class="cap">代表资产 × 六要素判级（完备度 · 非质量评分）</div></div>
+  <div class="acards" id="acards"></div>
+</div>
+
+<div class="tile c12">
+  <div class="t-head"><span class="eyebrow">Key Findings</span><h2>关键发现</h2></div>
+  <div class="findings" id="findings"></div>
+</div>
+</div>
+
+<footer>
+  架构形态：一堂「双三角模型」与「AI基本功 · Feature 周期律 v0.8」 · 视觉语言参考 home-renovation-workbench 模板<br>
+  数据真相源 <b>xy_capability_data.json</b> · 生成于 <span id="ftDate"></span>
+</footer>
+</div>
+
+<script id="cap-data" type="application/json">__DATA_JSON__</script>
+<script>
+const DATA = JSON.parse(document.getElementById('cap-data').textContent);
+const $ = id => document.getElementById(id);
+const dots = n => { const f=Math.round(n); return '●'.repeat(f)+'○'.repeat(5-f); };
+
+$('h1Title').textContent = DATA.meta.title || '双三角 × Feature 能力工作台';
+$('heroCap').textContent = DATA.profile.positioning + ' —— 双三角 × Feature 周期律 · 证据化自评';
+$('stageBadge').innerHTML = '综合段位 <b>'+DATA.profile.overallStage+'</b>';
+$('tpBadge').innerHTML = '特征思维拐点 <b>'+DATA.profile.featureTurningPoint.date+'</b>';
+$('genDate').textContent = DATA.meta.generated;
+$('ftDate').textContent = DATA.meta.generated;
+$('flyTop').textContent = DATA.dualTriangle.flywheel.top;
+$('flyBot').textContent = DATA.dualTriangle.flywheel.bottom;
+$('soulL').textContent = DATA.dualTriangle.soulQuestions.left;
+$('soulR').textContent = DATA.dualTriangle.soulQuestions.right;
+
+const cornerPos = {
+  creativity:{x:210,y:26,anchor:'middle',items:[[210,106],[210,122],[210,138]],right:false},
+  scene:{x:470,y:26,anchor:'middle',items:[[470,106],[470,122],[470,138],[470,154]],right:true},
+  aesthetic:{x:88,y:488,anchor:'middle',items:[[88,568],[88,584],[88,600]],right:false},
+  system:{x:245,y:488,anchor:'middle',items:[[245,568],[245,584],[245,600]],right:false},
+  fundamentals:{x:452,y:488,anchor:'middle',items:[[452,568],[452,584],[452,600]],right:true},
+  data:{x:598,y:488,anchor:'middle',items:[[598,568],[598,584],[598,600]],right:true}
+};
+function renderCorner(key, corner){
+  const p = cornerPos[key];
+  const g = $('g-'+key);
+  const color = p.right ? 'var(--olive-d)' : 'var(--terra-d)';
+  let s = '<text x="'+p.x+'" y="'+p.y+'" text-anchor="'+p.anchor+'" class="cname" font-family="var(--serif)" font-size="19" font-weight="600" fill="'+color+'">'+corner.name+'</text>';
+  s += '<text x="'+p.x+'" y="'+(p.y+24)+'" text-anchor="middle" class="dots" font-size="11" fill="'+color+'">'+dots(corner.levelScale)+'</text>';
+  s += '<rect x="'+(p.x-52)+'" y="'+(p.y+34)+'" width="104" height="22" rx="11" fill="#FAF7F1" stroke="'+color+'" stroke-width="0.8"/>';
+  s += '<text x="'+p.x+'" y="'+(p.y+49)+'" text-anchor="middle" font-size="10.5" fill="'+color+'">'+corner.level+' · 点击看证据</text>';
+  corner.original.forEach((it,i)=>{
+    const ip = p.items[i] || p.items[p.items.length-1];
+    s += '<text x="'+ip[0]+'" y="'+ip[1]+'" text-anchor="'+p.anchor+'" font-size="11" fill="#6E6355">'+it+'</text>';
+  });
+  g.innerHTML = s;
+  g.addEventListener('click', ()=>showCorner(key, corner, p.right));
+}
+DATA.dualTriangle.left.corners.forEach(c=>renderCorner(c.key,c));
+DATA.dualTriangle.right.corners.forEach(c=>renderCorner(c.key,c));
+
+function showCorner(key, corner, isRight){
+  document.querySelectorAll('.corner').forEach(g=>g.classList.remove('active'));
+  $('g-'+key).classList.add('active');
+  const d = $('cornerDetail');
+  d.className = 'detail'+(isRight?' right-color':'');
+  d.innerHTML = '<h3>'+corner.name+' <span class="dots" style="color:'+(isRight?'var(--olive-d)':'var(--terra)')+'">'+dots(corner.levelScale)+'</span><span class="chip">'+corner.level+'</span></h3>'
+    + '<div class="one">'+corner.oneLiner+'</div><ul>'+corner.evidence.map(e=>'<li>'+e+'</li>').join('')+'</ul>'
+    + '<div class="assets">'+corner.assets.map(a=>'<span class="chip">'+a+'</span>').join('')+'</div>';
+}
+showCorner('fundamentals', DATA.dualTriangle.right.corners[0], true);
+
+const dims = ['A','B','C','D'];
+const dimNames = {A:'A 角色身份',B:'B 上下文资源',C:'C 能力环境',D:'D 任务协作'};
+let pt = '<tr><th></th><th>'+dimNames.A+'</th><th>'+dimNames.B+'</th><th>'+dimNames.C+'</th><th>'+dimNames.D+'</th></tr>';
+DATA.featurePeriodic.levels.forEach(lv=>{
+  pt += '<tr><td class="lv"><b>'+lv.id+'</b><span>'+lv.name+'<br>'+lv.tagline+'</span></td>';
+  if(lv.id==='L1'){
+    const dimsK = Object.keys(lv.cells);
+    pt += '<td colspan="2" data-lv="L1" data-dim="'+dimsK[0]+'" class="'+(lv.myEvidence.length?'has-ev':'')+'"><span class="f">'+lv.cells[dimsK[0]]+'</span></td>';
+    pt += '<td colspan="2" data-lv="L1" data-dim="'+dimsK[1]+'" class="'+(lv.myEvidence.length?'has-ev':'')+'"><span class="f">'+lv.cells[dimsK[1]]+'</span></td>';
+  } else {
+    dims.forEach(dm=>{
+      pt += '<td data-lv="'+lv.id+'" data-dim="'+dm+'" class="'+(lv.myEvidence.some(e=>e.dim===dm)?'has-ev':'')+'"><span class="f">'+(lv.cells[dm]||'—')+'</span></td>';
+    });
+  }
+  pt += '</tr>';
+});
+$('ptable').innerHTML = pt;
+$('ptable').addEventListener('click', e=>{
+  const td = e.target.closest('td[data-lv]'); if(!td) return;
+  const lv = DATA.featurePeriodic.levels.find(l=>l.id===td.dataset.lv);
+  const evs = lv.myEvidence.filter(x=>td.dataset.dim.startsWith(x.dim) || x.dim==='跨维度' && td.dataset.lv==='L1');
+  $('cellDetail').className='detail';
+  $('cellDetail').innerHTML = '<h3>'+lv.id+' '+lv.name+' <span class="chip">'+(td.dataset.dim)+'</span></h3>'
+    + '<div class="one">'+lv.tagline+'</div>'
+    + '<div style="font-size:13px;color:#6E6355;margin-bottom:8px">'+td.querySelector('.f').textContent+'</div>'
+    + (evs.length ? '<ul>'+evs.map(x=>'<li><b>'+x.dim+'</b> · '+x.note+'</li>').join('')+'</ul>' : '<div class="one">该格暂无归位实证（周期律 v0.8 编号可自填，持续上探中）</div>');
+});
+$('cellDetail').innerHTML = '<h3>周期律 · 使用说明</h3>'
+  + '<div class="one">点击左侧网格任意格子，查看该「层 × 维度」的归位实证。</div>'
+  + '<ul><li><b>橙色顶边</b> = 该格已有实证归位（可点击直接查看）</li>'
+  + '<li>纵轴自下而上螺旋上升，纪律：<b>下层能解决就不上上层</b></li>'
+  + '<li>右侧场景栏为「借假修真」：场景是假，Feature 是真</li></ul>';
+
+$('sbTitle').textContent = DATA.featurePeriodic.sceneBar.title;
+$('sbItems').innerHTML = DATA.featurePeriodic.sceneBar.items.map(x=>'<span class="chip">'+x+'</span>').join('');
+
+$('timeline').innerHTML = DATA.iterationChains.map(c=>
+  '<div class="tl-card"><h4>'+c.name+'</h4><div class="span">'+c.span+' · '+c.commits+' commits</div><p>'+c.story+'</p></div>').join('');
+
+const hitStages = ['验证','内核','边界'];
+$('libMeter').innerHTML = DATA.library.stages.map(s=>'<div class="st'+(hitStages.includes(s)?' hit':'')+'">'+s+'</div>').join('');
+$('libNote').textContent = DATA.library.currentNote;
+$('libItems').innerHTML = DATA.library.items.map(i=>'<span class="it">'+i.name+' <small>· '+i.from+'</small></span>').join('');
+
+$('acards').innerHTML = DATA.assets.map(a=>{
+  const lvl = Object.entries(a.levels).map(([k,v])=>'<span class="'+(v==='完备'||v==='确认'?'full':'')+'">'+k+'·'+v+'</span>').join('');
+  return '<div class="a-card"><h4>'+a.name+'</h4><div class="role">'+a.role+'</div><div class="lvl-row">'+lvl+'</div><div class="hl">'+a.highlight+'</div></div>';
+}).join('');
+
+$('findings').innerHTML = DATA.keyFindings.map(f=>'<div class="f-item">'+f+'</div>').join('');
+</script>
+</body>
+</html>
