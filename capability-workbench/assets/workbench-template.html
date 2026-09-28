@@ -184,7 +184,7 @@ footer{text-align:center;color:var(--ink-mute);font-size:12px;margin-top:34px;pa
 
 <footer>
   架构形态：一堂「双三角模型」与「AI基本功 · Feature 周期律 v0.8」 · 视觉语言参考 home-renovation-workbench 模板<br>
-  数据真相源 <b>xy_capability_data.json</b> · 生成于 <span id="ftDate"></span>
+  数据真相源 <b>capability_data.json</b> · 生成于 <span id="ftDate"></span>
 </footer>
 </div>
 
@@ -197,7 +197,8 @@ const dots = n => { const f=Math.round(n); return '●'.repeat(f)+'○'.repeat(5
 $('h1Title').textContent = DATA.meta.title || '双三角 × Feature 能力工作台';
 $('heroCap').textContent = DATA.profile.positioning + ' —— 双三角 × Feature 周期律 · 证据化自评';
 $('stageBadge').innerHTML = '综合段位 <b>'+DATA.profile.overallStage+'</b>';
-$('tpBadge').innerHTML = '特征思维拐点 <b>'+DATA.profile.featureTurningPoint.date+'</b>';
+const tp = DATA.profile.featureTurningPoint;
+$('tpBadge').innerHTML = (tp && tp.date) ? '特征思维拐点 <b>'+tp.date+'</b>' : '';
 $('genDate').textContent = DATA.meta.generated;
 $('ftDate').textContent = DATA.meta.generated;
 $('flyTop').textContent = DATA.dualTriangle.flywheel.top;

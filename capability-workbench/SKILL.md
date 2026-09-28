@@ -1,7 +1,7 @@
 ---
 name: capability-workbench
 description: 双三角×Feature 能力诊断工作台——引导式扫描用户的多个项目，产出证据化个人能力画像（人类三角/审美·体系·创造力 + AI三角/基本功·数据·场景 + Feature 周期律归位），最终生成单文件展示工作台。触发：评估自己的 AI 协作能力、扫描我的项目做能力诊断、生成双三角或 Feature 能力工作台、能力盘点与段位定位。含强制人工门控（Gate）与引导式问答，不是一次性自动生成器。
-version: 1.0.0
+version: 1.0.1
 author: WingSky
 triggers:
   - 能力工作台
@@ -61,7 +61,7 @@ triggers:
 
 ### 阶段 3 · 汇总
 - 按决断结果修正判级 → 产出能力评估汇总（段位定位 + 画像 + 差距与路径）。
-- 按 `references/data-schema.md` 生成数据文件 `xy_capability_data.json`（或按被评者命名）。
+- 按 `references/data-schema.md` 生成数据文件 `capability_data.json`（或按被评者命名，如 `<姓名>_capability_data.json`）。
 
 ### 阶段 4 ·（可选）任务现场深扫
 - 若用户愿提供 1–3 个真实 AI 协作任务的现场材料（聊天导出 / prompt 迭代 / 失败案例），做「使用质量」深扫：工具思维 vs Feature 思维诊断、归因破局、三张牌使用痕迹。

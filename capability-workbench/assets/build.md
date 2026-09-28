@@ -5,7 +5,7 @@
 ```bash
 python3 - <<'EOF'
 import json
-data = open('xy_capability_data.json', encoding='utf-8').read()
+data = open('capability_data.json', encoding='utf-8').read()
 json.loads(data)                      # 先校验 JSON 合法
 tpl = open('workbench-template.html', encoding='utf-8').read()
 assert '__DATA_JSON__' in tpl
